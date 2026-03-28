@@ -93,7 +93,10 @@ export default function OrganizationTabsLayout() {
           sceneStyle: {
             flex: 1,
             paddingBottom: contentBottomPad,
-            backgroundColor: "transparent",
+            backgroundColor: "#FAFBFC",
+          },
+          sceneContainerStyle: {
+            backgroundColor: "#FAFBFC",
           },
           tabBarStyle: {
             position: "absolute",

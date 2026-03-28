@@ -86,6 +86,7 @@ export default function OrganizationDashboard() {
         visible={createEventOpen}
         onClose={() => setCreateEventOpen(false)}
         organizationName={data.organizationName}
+        onCreated={() => void refetch()}
       />
     </ScreenWrapper>
   );

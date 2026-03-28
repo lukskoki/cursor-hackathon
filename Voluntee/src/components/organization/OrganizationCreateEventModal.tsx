@@ -78,32 +78,47 @@ export function OrganizationCreateEventModal({
     setDurationStr("180");
   }, [visible]);
 
+  const [validationError, setValidationError] = useState<string | null>(null);
+
   async function handleSubmit() {
-    if (!title.trim()) return;
+    setValidationError(null);
+
+    if (!title.trim()) {
+      setValidationError("Please enter an event title.");
+      return;
+    }
+    if (!locationQuery.trim()) {
+      setValidationError("Please enter a location.");
+      return;
+    }
 
     const volunteersNeeded = parseInt(limitStr, 10) || 12;
     const points = parseInt(pointsXp, 10) || 15;
     const startsAt = parseDateTimeToISO(dateStr, timeStr);
     const durationMinutes = parseInt(durationStr, 10) || 180;
 
-    const id = await create({
-      title: title.trim(),
-      description: description.trim() || title.trim(),
-      category,
-      tags: [category],
-      address: locationQuery.trim() || "Zagreb, Croatia",
-      latitude: 45.815,
-      longitude: 15.9819,
-      startsAt,
-      durationMinutes,
-      volunteersNeeded,
-      volunteersApplied: 0,
-      points,
-    });
+    try {
+      const id = await create({
+        title: title.trim(),
+        description: description.trim() || title.trim(),
+        category,
+        tags: [category],
+        address: locationQuery.trim(),
+        latitude: 45.815,
+        longitude: 15.9819,
+        startsAt,
+        durationMinutes,
+        volunteersNeeded,
+        volunteersApplied: 0,
+        points,
+      });
 
-    if (id) {
-      onCreated?.();
-      onClose();
+      if (id) {
+        onCreated?.();
+        onClose();
+      }
+    } catch {
+      setValidationError("Failed to create event. Please try again.");
     }
   }
 
@@ -267,7 +282,9 @@ export function OrganizationCreateEventModal({
             </View>
           </View>
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {(validationError || error) ? (
+            <Text style={styles.errorText}>{validationError || error}</Text>
+          ) : null}
 
           <Pressable
             style={[styles.submit, loading && styles.submitDisabled]}

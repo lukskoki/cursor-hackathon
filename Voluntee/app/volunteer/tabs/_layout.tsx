@@ -95,7 +95,10 @@ export default function VolunteerTabsLayout() {
         sceneStyle: {
           flex: 1,
           paddingBottom: contentBottomPad,
-          backgroundColor: "transparent",
+          backgroundColor: "#FFFFFF",
+        },
+        sceneContainerStyle: {
+          backgroundColor: "#FFFFFF",
         },
         tabBarStyle: {
           position: "absolute",
