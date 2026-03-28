@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, FlatList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFirebaseStatus } from "@/hooks/shared/useFirebaseStatus";
 
 const MOCK_EVENTS = [
   { id: "1", title: "Park cleanup", category: "Environment", location: "Maksimir, Zagreb", points: 15 },
@@ -9,9 +10,12 @@ const MOCK_EVENTS = [
 ];
 
 export default function VolunteerHome() {
+  const fb = useFirebaseStatus();
+
   return (
     <SafeAreaView style={styles.root}>
       <Text style={styles.heading}>Discover events</Text>
+      {__DEV__ ? <FirebaseDevBanner status={fb} /> : null}
       <FlatList
         data={MOCK_EVENTS}
         keyExtractor={(i) => i.id}
@@ -31,9 +35,53 @@ export default function VolunteerHome() {
   );
 }
 
+function FirebaseDevBanner({
+  status,
+}: {
+  status: ReturnType<typeof useFirebaseStatus>;
+}) {
+  let text = "Firebase: …";
+  let tone: "ok" | "warn" | "err" = "warn";
+  if (status.kind === "loading") {
+    text = "Firebase: provjera…";
+  } else if (status.kind === "missing_env") {
+    text = "Firebase: nema EXPO_PUBLIC_* u .env";
+    tone = "err";
+  } else if (status.kind === "ok") {
+    text = `Firebase: SDK OK · projekt ${status.projectId}`;
+    tone = "ok";
+  } else if (status.kind === "error") {
+    text = `Firebase: greška · ${status.message}`;
+    tone = "err";
+  }
+  return (
+    <View
+      style={[
+        styles.fbBanner,
+        tone === "ok" && styles.fbOk,
+        tone === "warn" && styles.fbWarn,
+        tone === "err" && styles.fbErr,
+      ]}
+    >
+      <Text style={styles.fbText}>{text}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#fff" },
   heading: { fontSize: 24, fontWeight: "700", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
+  fbBanner: {
+    marginHorizontal: 20,
+    marginBottom: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  fbOk: { backgroundColor: "#E8F5E9" },
+  fbWarn: { backgroundColor: "#FFF8E1" },
+  fbErr: { backgroundColor: "#FFEBEE" },
+  fbText: { fontSize: 12, color: "#333" },
   list: { paddingHorizontal: 20, gap: 12, paddingBottom: 20 },
   card: {
     backgroundColor: "#f8f9fa",

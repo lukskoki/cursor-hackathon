@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,27 +7,152 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
-import { router } from "expo-router";
-import { useAuthStore, type UserRole } from "@/store/authStore";
+import Constants from "expo-constants";
+import * as Google from "expo-auth-session/providers/google";
+import { Link, router } from "expo-router";
+import { authService } from "@/services/shared/authService";
+import type { UserRole } from "@/types/shared/user";
 
 const ROLES: { value: UserRole; label: string }[] = [
   { value: "volunteer", label: "Volunteer" },
   { value: "organization", label: "Organization" },
 ];
 
-export default function Login() {
-  const signIn = useAuthStore((s) => s.signIn);
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<UserRole>("volunteer");
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "";
 
-  const handleLogin = () => {
-    signIn(email || "test@voluntee.app", role);
-    if (role === "volunteer") {
-      router.replace("/volunteer/tabs/home");
-    } else {
-      router.replace("/organization/tabs/dashboard");
+/**
+ * Google Web OAuth prihvaća samo https:// redirecte. Expo Go inače generira exp://… — to NE ide u Google.
+ * Proxy URL mora biti na listi: Google Cloud → Web client → Authorized redirect URIs.
+ */
+function useExpoAuthProxyRedirectUri(): string {
+  return useMemo(() => {
+    const full = Constants.expoConfig?.originalFullName;
+    if (typeof full === "string" && full.length > 0) {
+      return `https://auth.expo.io/${full}`;
     }
+    const slug = Constants.expoConfig?.slug ?? "voluntee";
+    return `https://auth.expo.io/@anonymous/${slug}`;
+  }, []);
+}
+
+function mapAuthError(e: unknown): string {
+  const code =
+    typeof e === "object" && e !== null && "code" in e
+      ? String((e as { code: string }).code)
+      : "";
+  switch (code) {
+    case "auth/invalid-email":
+      return "Neispravan email.";
+    case "auth/user-disabled":
+      return "Račun je onemogućen.";
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+    case "auth/invalid-credential":
+      return "Netočan email ili lozinka.";
+    case "auth/account-exists-with-different-credential":
+      return "Email je već registriran drugom metodom.";
+    case "auth/too-many-requests":
+      return "Previše pokušaja. Pričekaj malo.";
+    default:
+      return e instanceof Error ? e.message : "Prijava nije uspjela.";
+  }
+}
+
+export default function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<UserRole>("volunteer");
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const googleRedirectUri = useExpoAuthProxyRedirectUri();
+
+  /**
+   * Za https://auth.expo.io proxy redirect, Google traži da redirect bude na Web OAuth klijentu.
+   * Koristi isti Web client ID na iOS/Android (ne zasebni iOS client + exp:// redirect).
+   */
+  const webId =
+    GOOGLE_WEB_CLIENT_ID || "missing-web-client-id.apps.googleusercontent.com";
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    webClientId: webId,
+    iosClientId: webId,
+    androidClientId: webId,
+    redirectUri: googleRedirectUri,
+  });
+
+  useEffect(() => {
+    if (__DEV__) {
+      console.log(
+        "[Google OAuth] U Web client → Authorized redirect URIs dodaj TOČNO:\n",
+        googleRedirectUri
+      );
+    }
+  }, [googleRedirectUri]);
+
+  useEffect(() => {
+    if (response?.type !== "success") return;
+    const idToken = response.params.id_token;
+    if (!idToken) {
+      setError("Google nije vratio id_token. Provjeri Web client ID i redirect URI u Google Cloud.");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setGoogleLoading(true);
+      setError(null);
+      try {
+        await authService.signInWithGoogleIdToken(idToken, role);
+        if (!cancelled) {
+          if (role === "volunteer") {
+            router.replace("/volunteer/tabs/home");
+          } else {
+            router.replace("/organization/tabs/dashboard");
+          }
+        }
+      } catch (e) {
+        if (!cancelled) setError(mapAuthError(e));
+      } finally {
+        if (!cancelled) setGoogleLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [response, role]);
+
+  const busy = loading || googleLoading;
+
+  const handleLogin = async () => {
+    setError(null);
+    if (!email.trim() || !password) {
+      setError("Upiši email i lozinku.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await authService.signInWithEmail(email, password, role);
+      if (role === "volunteer") {
+        router.replace("/volunteer/tabs/home");
+      } else {
+        router.replace("/organization/tabs/dashboard");
+      }
+    } catch (e) {
+      setError(mapAuthError(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    if (!GOOGLE_WEB_CLIENT_ID) {
+      setError("Dodaj EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID u .env (Google Cloud → OAuth Web client).");
+      return;
+    }
+    setError(null);
+    await promptAsync();
   };
 
   return (
@@ -39,6 +164,27 @@ export default function Login() {
         <Text style={styles.logo}>voluntee</Text>
         <Text style={styles.subtitle}>Sign in to continue</Text>
 
+        {GOOGLE_WEB_CLIENT_ID ? (
+          <>
+            <Pressable
+              style={[styles.googleBtn, busy && styles.loginBtnDisabled]}
+              onPress={handleGoogle}
+              disabled={busy || !request}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color="#333" />
+              ) : (
+                <Text style={styles.googleBtnTxt}>Nastavi s Googleom</Text>
+              )}
+            </Pressable>
+            <Text style={styles.divider}>ili email</Text>
+          </>
+        ) : (
+          <Text style={styles.hintGoogle}>
+            Za Google prijavu dodaj EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID u .env.
+          </Text>
+        )}
+
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -47,6 +193,17 @@ export default function Login() {
           keyboardType="email-address"
           value={email}
           onChangeText={setEmail}
+          editable={!busy}
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#999"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+          editable={!busy}
         />
 
         <Text style={styles.label}>I am a...</Text>
@@ -56,6 +213,7 @@ export default function Login() {
               key={r.value}
               style={[styles.roleBtn, role === r.value && styles.roleBtnActive]}
               onPress={() => setRole(r.value)}
+              disabled={busy}
             >
               <Text
                 style={[
@@ -69,9 +227,25 @@ export default function Login() {
           ))}
         </View>
 
-        <Pressable style={styles.loginBtn} onPress={handleLogin}>
-          <Text style={styles.loginTxt}>Log in</Text>
+        {error ? <Text style={styles.err}>{error}</Text> : null}
+
+        <Pressable
+          style={[styles.loginBtn, busy && styles.loginBtnDisabled]}
+          onPress={handleLogin}
+          disabled={busy}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.loginTxt}>Log in</Text>
+          )}
         </Pressable>
+
+        <Link href="/shared/auth/register" asChild>
+          <Pressable disabled={busy}>
+            <Text style={styles.link}>Nemaš račun? Registracija</Text>
+          </Pressable>
+        </Link>
       </View>
     </KeyboardAvoidingView>
   );
@@ -96,7 +270,30 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#888",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 12,
+  },
+  googleBtn: {
+    borderWidth: 1.5,
+    borderColor: "#ddd",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    backgroundColor: "#fff",
+    minHeight: 52,
+    justifyContent: "center",
+  },
+  googleBtnTxt: { fontSize: 16, fontWeight: "600", color: "#333" },
+  divider: {
+    textAlign: "center",
+    fontSize: 13,
+    color: "#999",
+    marginBottom: 4,
+  },
+  hintGoogle: {
+    fontSize: 12,
+    color: "#999",
+    textAlign: "center",
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
@@ -122,12 +319,22 @@ const styles = StyleSheet.create({
   },
   roleTxt: { fontSize: 15, color: "#666" },
   roleTxtActive: { color: "#208AEF", fontWeight: "600" },
+  err: { color: "#c62828", fontSize: 14, textAlign: "center" },
   loginBtn: {
     backgroundColor: "#208AEF",
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: "center",
     marginTop: 12,
+    minHeight: 52,
+    justifyContent: "center",
   },
+  loginBtnDisabled: { opacity: 0.7 },
   loginTxt: { color: "#fff", fontSize: 17, fontWeight: "700" },
+  link: {
+    color: "#208AEF",
+    textAlign: "center",
+    fontSize: 15,
+    marginTop: 8,
+  },
 });

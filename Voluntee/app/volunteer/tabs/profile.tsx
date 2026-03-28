@@ -28,8 +28,8 @@ export default function VolunteerProfile() {
   const { profile, loading, error } = useVolunteerProfile();
   const [tab, setTab] = useState<ProfileTab>("activities");
 
-  const handleLogout = () => {
-    signOut();
+  const handleLogout = async () => {
+    await signOut();
     router.replace("/");
   };
 
