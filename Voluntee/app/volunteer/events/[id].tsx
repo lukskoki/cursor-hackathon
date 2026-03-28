@@ -14,15 +14,16 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import type { VolunteerEvent, EventCategory } from "@/types/volunteer/event";
 import { CATEGORY_LABELS } from "@/types/volunteer/event";
 import { volunteerMapService } from "@/services/volunteer/map/volunteerMapService";
+import { useVolunteerAppliedStore } from "@/store/volunteerAppliedStore";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
 const CAT_ICON: Record<EventCategory, IconName> = {
-  environment: "leaf",
-  social: "people",
-  animals: "paw",
-  community: "heart",
-  education: "book",
+  environment: "leaf-outline",
+  social: "people-outline",
+  animals: "paw-outline",
+  community: "heart-outline",
+  education: "book-outline",
 };
 
 const CAT_COLOR: Record<EventCategory, string> = {
@@ -59,6 +60,16 @@ export default function VolunteerEventDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [event, setEvent] = useState<VolunteerEvent | null>(null);
   const [loading, setLoading] = useState(true);
+  const [favorite, setFavorite] = useState(false);
+  const [appliedToastVisible, setAppliedToastVisible] = useState(false);
+  const markApplied = useVolunteerAppliedStore((s) => s.markApplied);
+  const userHasApplied = useVolunteerAppliedStore(
+    (s) => !!(id && s.appliedIds[id]),
+  );
+
+  useEffect(() => {
+    setAppliedToastVisible(false);
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -67,6 +78,15 @@ export default function VolunteerEventDetail() {
       setLoading(false);
     });
   }, [id]);
+
+  useEffect(() => {
+    if (!appliedToastVisible) return;
+    const t = setTimeout(() => {
+      setAppliedToastVisible(false);
+      if (id) markApplied(id);
+    }, 2200);
+    return () => clearTimeout(t);
+  }, [appliedToastVisible, id, markApplied]);
 
   if (loading) {
     return (
@@ -90,6 +110,8 @@ export default function VolunteerEventDetail() {
   const color = CAT_COLOR[event.category];
   const spotsLeft = event.volunteersNeeded - event.volunteersApplied;
   const spotsPct = (event.volunteersApplied / event.volunteersNeeded) * 100;
+  const isFullyBooked = spotsLeft <= 0;
+  const applyDisabled = isFullyBooked || userHasApplied;
 
   return (
     <View style={styles.root}>
@@ -112,9 +134,10 @@ export default function VolunteerEventDetail() {
       >
         <View style={[styles.heroBanner, { backgroundColor: color + "14" }]}>
           <View style={[styles.heroIcon, { backgroundColor: color + "22" }]}>
-            <Ionicons name={CAT_ICON[event.category]} size={36} color={color} />
+            <Ionicons name={CAT_ICON[event.category]} size={40} color={color} />
           </View>
           <View style={[styles.categoryBadge, { backgroundColor: color + "1A" }]}>
+            <Ionicons name={CAT_ICON[event.category]} size={17} color={color} />
             <Text style={[styles.categoryText, { color }]}>
               {CATEGORY_LABELS[event.category]}
             </Text>
@@ -122,7 +145,21 @@ export default function VolunteerEventDetail() {
         </View>
 
         <View style={styles.body}>
-          <Text style={styles.title}>{event.title}</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{event.title}</Text>
+            <Pressable
+              onPress={() => setFavorite((f) => !f)}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={favorite ? "Remove from favorites" : "Add to favorites"}
+            >
+              <Ionicons
+                name={favorite ? "heart" : "heart-outline"}
+                size={26}
+                color={favorite ? "#FF3B30" : "#bbb"}
+              />
+            </Pressable>
+          </View>
           <View style={styles.organizerRow}>
             <Ionicons name="business-outline" size={14} color="#888" />
             <Text style={styles.organizer}>{event.organizerName}</Text>
@@ -181,7 +218,7 @@ export default function VolunteerEventDetail() {
           <Text style={styles.sectionTitle}>Category & Tags</Text>
           <View style={styles.tagsWrap}>
             <View style={[styles.tag, { backgroundColor: color + "1A" }]}>
-              <Ionicons name={CAT_ICON[event.category]} size={13} color={color} />
+              <Ionicons name={CAT_ICON[event.category]} size={15} color={color} />
               <Text style={[styles.tagText, { color }]}>
                 {CATEGORY_LABELS[event.category]}
               </Text>
@@ -202,17 +239,40 @@ export default function VolunteerEventDetail() {
         <Pressable
           style={[
             styles.applyBtn,
-            spotsLeft <= 0 && styles.applyBtnDisabled,
+            isFullyBooked && !userHasApplied && styles.applyBtnDisabled,
+            userHasApplied && { backgroundColor: color },
           ]}
-          disabled={spotsLeft <= 0}
-          onPress={() => router.push(`/volunteer/events/apply?id=${event.id}`)}
+          disabled={applyDisabled}
+          onPress={() => {
+            if (appliedToastVisible) return;
+            setAppliedToastVisible(true);
+          }}
         >
-          <Ionicons name="hand-left" size={20} color="#fff" />
+          <Ionicons
+            name={userHasApplied ? "checkmark" : "hand-left"}
+            size={20}
+            color="#fff"
+          />
           <Text style={styles.applyText}>
-            {spotsLeft > 0 ? "Apply to Volunteer" : "Fully Booked"}
+            {userHasApplied
+              ? "Applied"
+              : isFullyBooked
+                ? "Fully Booked"
+                : "Apply to Volunteer"}
           </Text>
         </Pressable>
       </SafeAreaView>
+
+      {appliedToastVisible ? (
+        <View style={styles.toastOverlay} pointerEvents="none">
+          <View style={styles.toastCard}>
+            <View style={styles.toastCheckCircle}>
+              <Ionicons name="checkmark" size={28} color="#fff" />
+            </View>
+            <Text style={styles.toastText}>Applied successfully</Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -275,14 +335,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   categoryBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 12,
   },
   categoryText: { fontSize: 13, fontWeight: "600" },
 
   body: { paddingHorizontal: 20, paddingTop: 20 },
-  title: { fontSize: 24, fontWeight: "700", color: "#111", marginBottom: 6 },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 6,
+  },
+  title: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#111",
+    lineHeight: 30,
+  },
   organizerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -371,4 +446,38 @@ const styles = StyleSheet.create({
   },
   applyBtnDisabled: { backgroundColor: "#ccc" },
   applyText: { fontSize: 16, fontWeight: "700", color: "#fff" },
+
+  toastOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.2)",
+  },
+  toastCard: {
+    alignItems: "center",
+    paddingHorizontal: 28,
+    paddingVertical: 22,
+    borderRadius: 16,
+    backgroundColor: "#fff",
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  toastCheckCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#208AEF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  toastText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111",
+    textAlign: "center",
+  },
 });

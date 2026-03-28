@@ -85,6 +85,7 @@ export default function VolunteerTabsLayout() {
 
   return (
     <Tabs
+      safeAreaInsets={{ bottom: 0, left: 0, right: 0 }}
       screenOptions={{
         tabBarActiveTintColor: ACTIVE_BLUE,
         tabBarInactiveTintColor: INACTIVE_GRAY,
@@ -115,6 +116,7 @@ export default function VolunteerTabsLayout() {
           paddingTop: 0,
           paddingBottom: 0,
           margin: 0,
+          marginHorizontal: 0,
           borderRadius: TAB_BAR_HEIGHT / 2,
           overflow: "hidden",
           backgroundColor: "transparent",
@@ -123,8 +125,11 @@ export default function VolunteerTabsLayout() {
           borderBottomWidth: 0,
           borderLeftWidth: 0,
           borderRightWidth: 0,
+          borderColor: "transparent",
           elevation: 0,
           shadowOpacity: 0,
+          shadowRadius: 0,
+          shadowOffset: { width: 0, height: 0 },
         },
       }}
     >
