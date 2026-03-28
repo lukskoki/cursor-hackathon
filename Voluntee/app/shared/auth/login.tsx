@@ -7,27 +7,21 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from "react-native";
 import { router } from "expo-router";
-import { useAuthStore, type UserRole } from "@/store/authStore";
-
-const ROLES: { value: UserRole; label: string }[] = [
-  { value: "volunteer", label: "Volunteer" },
-  { value: "organization", label: "Organization" },
-];
+import { useLogin } from "@/hooks/shared/useAuth";
+import { useAuthStore } from "@/store/authStore";
 
 export default function Login() {
-  const signIn = useAuthStore((s) => s.signIn);
+  const firebaseConfigured = useAuthStore((s) => s.firebaseConfigured);
+  const { login, loading, error, setError } = useLogin();
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<UserRole>("volunteer");
+  const [password, setPassword] = useState("");
 
   const handleLogin = () => {
-    signIn(email || "test@voluntee.app", role);
-    if (role === "volunteer") {
-      router.replace("/volunteer/tabs/home");
-    } else {
-      router.replace("/organization/tabs/dashboard");
-    }
+    setError(null);
+    void login(email, password);
   };
 
   return (
@@ -35,9 +29,21 @@ export default function Login() {
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={styles.container}>
-        <Text style={styles.logo}>voluntee</Text>
-        <Text style={styles.subtitle}>Sign in to continue</Text>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scroll}
+      >
+        <Text style={styles.logo}>Voluntee</Text>
+        <Text style={styles.subtitle}>Log in to continue</Text>
+
+        {!firebaseConfigured ? (
+          <Text style={styles.warn}>
+            Firebase is not configured. Add EXPO_PUBLIC_FIREBASE_* keys to your
+            environment and restart the dev server.
+          </Text>
+        ) : null}
+
+        {error ? <Text style={styles.err}>{error}</Text> : null}
 
         <TextInput
           style={styles.input}
@@ -45,45 +51,68 @@ export default function Login() {
           placeholderTextColor="#999"
           autoCapitalize="none"
           keyboardType="email-address"
+          autoComplete="email"
           value={email}
           onChangeText={setEmail}
         />
 
-        <Text style={styles.label}>I am a...</Text>
-        <View style={styles.roleRow}>
-          {ROLES.map((r) => (
-            <Pressable
-              key={r.value}
-              style={[styles.roleBtn, role === r.value && styles.roleBtnActive]}
-              onPress={() => setRole(r.value)}
-            >
-              <Text
-                style={[
-                  styles.roleTxt,
-                  role === r.value && styles.roleTxtActive,
-                ]}
-              >
-                {r.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#999"
+          secureTextEntry
+          autoComplete="password"
+          value={password}
+          onChangeText={setPassword}
+        />
 
-        <Pressable style={styles.loginBtn} onPress={handleLogin}>
-          <Text style={styles.loginTxt}>Log in</Text>
+        <Pressable
+          style={[styles.loginBtn, loading && styles.btnDisabled]}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          <Text style={styles.loginTxt}>{loading ? "Signing in…" : "Log in"}</Text>
         </Pressable>
-      </View>
+
+        <Pressable
+          style={styles.linkWrap}
+          onPress={() => router.replace("/shared/onboarding/welcome")}
+        >
+          <Text style={styles.link}>← Back to welcome</Text>
+        </Pressable>
+
+        <View style={styles.signupBlock}>
+          <Text style={styles.signupHeading}>New here?</Text>
+          <Pressable
+            style={styles.signupLinkRow}
+            onPress={() =>
+              router.replace("/shared/auth/register?role=volunteer")
+            }
+          >
+            <Text style={styles.linkInline}>Sign up as volunteer</Text>
+          </Pressable>
+          <Pressable
+            style={styles.signupLinkRow}
+            onPress={() =>
+              router.replace("/shared/auth/register?role=organization")
+            }
+          >
+            <Text style={styles.linkInline}>Sign up as organization</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#fff" },
-  container: {
-    flex: 1,
+  scroll: {
+    flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 32,
-    gap: 14,
+    paddingVertical: 24,
+    gap: 12,
   },
   logo: {
     fontSize: 36,
@@ -96,7 +125,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#888",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 12,
+  },
+  warn: {
+    fontSize: 13,
+    color: "#b45309",
+    backgroundColor: "#fffbeb",
+    padding: 12,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  err: {
+    fontSize: 14,
+    color: "#c53030",
+    textAlign: "center",
   },
   input: {
     borderWidth: 1,
@@ -106,28 +148,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: "#fafafa",
   },
-  label: { fontSize: 14, color: "#555", marginTop: 4 },
-  roleRow: { flexDirection: "row", gap: 10 },
-  roleBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#ddd",
-    alignItems: "center",
-  },
-  roleBtnActive: {
-    borderColor: "#208AEF",
-    backgroundColor: "#EDF5FF",
-  },
-  roleTxt: { fontSize: 15, color: "#666" },
-  roleTxtActive: { color: "#208AEF", fontWeight: "600" },
   loginBtn: {
     backgroundColor: "#208AEF",
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: "center",
-    marginTop: 12,
+    marginTop: 8,
   },
+  btnDisabled: { opacity: 0.7 },
   loginTxt: { color: "#fff", fontSize: 17, fontWeight: "700" },
+  linkWrap: { alignItems: "center", marginTop: 8 },
+  link: { fontSize: 15, color: "#208AEF", fontWeight: "600" },
+  signupBlock: {
+    marginTop: 20,
+    alignItems: "center",
+    gap: 10,
+  },
+  signupHeading: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+  },
+  signupLinkRow: {
+    paddingVertical: 4,
+  },
+  linkInline: { fontSize: 15, color: "#208AEF", fontWeight: "600" },
 });

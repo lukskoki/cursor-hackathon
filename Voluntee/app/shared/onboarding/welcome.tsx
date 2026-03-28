@@ -1,10 +1,24 @@
+import { useFocusEffect } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback } from "react";
+import { BackHandler, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { ScreenWrapper } from "@/components/shared/ScreenWrapper";
 import { colors, spacing, typography } from "@/theme";
 
 export default function Welcome() {
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+        if (router.canGoBack()) {
+          return true;
+        }
+        return false;
+      });
+      return () => sub.remove();
+    }, []),
+  );
+
   return (
     <ScreenWrapper style={styles.screen}>
       <View style={styles.content}>
@@ -14,8 +28,7 @@ export default function Welcome() {
             <Text style={styles.titleBrand}>Voluntee</Text>
           </Text>
           <Text style={styles.subtitle}>
-            Empowering Zagreb's spirit through collective action and
-            meaningful connections.
+            {`Empowering Zagreb's spirit through collective action and meaningful connections.`}
           </Text>
         </View>
 
@@ -76,7 +89,7 @@ export default function Welcome() {
             onPress={() => router.push("/shared/auth/login")}
             style={({ pressed }) => pressed && styles.linkPressed}
           >
-            <Text style={styles.signInLink}>Sign in to your account</Text>
+            <Text style={styles.signInLink}>Log in to your account</Text>
           </Pressable>
         </View>
 

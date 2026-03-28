@@ -1,13 +1,15 @@
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { authService } from "@/services/shared/authService";
 import { useAuthStore } from "@/store/authStore";
 
 export default function VolunteerProfile() {
-  const { email, signOut } = useAuthStore();
+  const email = useAuthStore((s) => s.user?.email ?? "");
 
-  const handleLogout = () => {
-    signOut();
+  const handleLogout = async () => {
+    await authService.signOutUser();
+    useAuthStore.getState().setUser(null);
     router.replace("/");
   };
 
