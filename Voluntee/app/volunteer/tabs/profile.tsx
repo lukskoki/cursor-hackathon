@@ -30,6 +30,7 @@ export default function VolunteerProfile() {
 
   const handleLogout = async () => {
     await authService.signOutUser();
+    useAuthStore.getState().setDevOrganizationBypass(false);
     useAuthStore.getState().setUser(null);
     router.replace("/");
   };
