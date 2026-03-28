@@ -64,7 +64,7 @@ export default function VolunteerMap() {
             longitude={evt.longitude}
             category={evt.category}
             isSelected={evt.id === selectedEventId}
-            onPress={() => selectEvent(evt.id)}
+            onPress={() => handleEventPress(evt.id)}
           />
         ))}
       </MapView>
