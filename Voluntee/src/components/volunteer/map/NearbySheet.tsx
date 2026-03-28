@@ -9,7 +9,6 @@ type Props = {
   loading: boolean;
   searchQuery: string;
   onEventPress: (id: string) => void;
-  floatingButton?: React.ReactNode;
 };
 
 export function NearbySheet({
@@ -18,14 +17,13 @@ export function NearbySheet({
   loading,
   searchQuery,
   onEventPress,
-  floatingButton,
 }: Props) {
   const headerText = searchQuery
     ? `${events.length} result${events.length === 1 ? "" : "s"} for "${searchQuery}"`
     : `${events.length} opportunit${events.length === 1 ? "y" : "ies"} within ${radiusKm}km`;
 
   return (
-    <DraggableSheet floatingButton={floatingButton}>
+    <DraggableSheet>
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
           <Text style={styles.sectionTitle}>Nearby Activities</Text>
@@ -63,7 +61,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     paddingHorizontal: 20,
-    paddingTop: 6,
+    paddingTop: 2,
     paddingBottom: 14,
   },
   headerLeft: { flex: 1, gap: 2 },

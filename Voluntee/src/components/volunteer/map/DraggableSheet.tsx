@@ -1,107 +1,89 @@
-import { useRef, useCallback } from "react";
+import { useRef, useEffect } from "react";
 import {
   View,
   Animated,
   PanResponder,
   Dimensions,
   StyleSheet,
-  type LayoutChangeEvent,
 } from "react-native";
 
 const SCREEN_H = Dimensions.get("window").height;
+const SNAP_FRACTIONS = [0.12, 0.42, 0.85];
+const SNAP_Y = SNAP_FRACTIONS.map((f) => SCREEN_H * (1 - f));
+const TOP_Y = Math.min(...SNAP_Y);
+const BOTTOM_Y = Math.max(...SNAP_Y);
+const INITIAL_Y = SNAP_Y[1];
 
-type Props = {
-  snapFractions?: number[];
-  initialSnap?: number;
-  floatingButton?: React.ReactNode;
-  children: React.ReactNode;
-};
+console.log("[Sheet] SCREEN_H:", SCREEN_H, "SNAP_Y:", SNAP_Y, "TOP_Y:", TOP_Y, "BOTTOM_Y:", BOTTOM_Y, "INITIAL_Y:", INITIAL_Y);
 
-export function DraggableSheet({
-  snapFractions = [0.12, 0.42, 0.85],
-  initialSnap = 1,
-  floatingButton,
-  children,
-}: Props) {
-  const snapPoints = snapFractions.map((f) => SCREEN_H * (1 - f));
-  const translateY = useRef(new Animated.Value(snapPoints[initialSnap])).current;
-  const currentY = useRef(snapPoints[initialSnap]);
-  const containerH = useRef(SCREEN_H);
+type Props = { children: React.ReactNode };
 
-  const onLayout = useCallback((e: LayoutChangeEvent) => {
-    containerH.current = e.nativeEvent.layout.height;
-  }, []);
+export function DraggableSheet({ children }: Props) {
+  const y = useRef(new Animated.Value(INITIAL_Y)).current;
+  const lastPos = useRef(INITIAL_Y);
 
-  const snapTo = useCallback(
-    (toValue: number) => {
-      currentY.current = toValue;
-      Animated.spring(translateY, {
-        toValue,
-        useNativeDriver: true,
-        damping: 20,
-        stiffness: 200,
-        mass: 0.8,
-      }).start();
-    },
-    [translateY],
-  );
-
-  const findClosestSnap = useCallback(
-    (y: number, vy: number) => {
-      const projected = y + vy * 100;
-      let closest = snapPoints[0];
-      let minDist = Math.abs(projected - closest);
-      for (let i = 1; i < snapPoints.length; i++) {
-        const dist = Math.abs(projected - snapPoints[i]);
-        if (dist < minDist) {
-          minDist = dist;
-          closest = snapPoints[i];
-        }
-      }
-      return closest;
-    },
-    [snapPoints],
-  );
+  useEffect(() => {
+    const id = y.addListener(({ value }) => {
+      lastPos.current = value;
+    });
+    return () => y.removeListener(id);
+  }, [y]);
 
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 8,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 4,
+      onMoveShouldSetPanResponderCapture: (_, gs) => Math.abs(gs.dy) > 4,
+
       onPanResponderGrant: () => {
-        translateY.setOffset(currentY.current);
-        translateY.setValue(0);
+        console.log("[Sheet] GRANT lastPos:", lastPos.current);
+        y.setOffset(lastPos.current);
+        y.setValue(0);
       },
-      onPanResponderMove: (_, g) => {
-        const next = currentY.current + g.dy;
-        const minY = snapPoints[0];
-        const maxY = snapPoints[snapPoints.length - 1];
-        if (next >= minY && next <= maxY) {
-          translateY.setValue(g.dy);
-        }
-      },
-      onPanResponderRelease: (_, g) => {
-        translateY.flattenOffset();
-        const raw = currentY.current + g.dy;
-        snapTo(findClosestSnap(raw, g.vy));
+
+      onPanResponderMove: Animated.event([null, { dy: y }], {
+        useNativeDriver: false,
+        listener: (_: unknown, gs: { dy: number }) => {
+          console.log("[Sheet] MOVE dy:", gs.dy, "lastPos:", lastPos.current);
+        },
+      }),
+
+      onPanResponderRelease: (_: unknown, gs: { dy: number; vy: number }) => {
+        y.flattenOffset();
+        console.log("[Sheet] RELEASE gs.dy:", gs.dy, "lastPos:", lastPos.current);
+        const pos = Math.max(TOP_Y, Math.min(BOTTOM_Y, lastPos.current));
+        const target = closestSnap(pos);
+        console.log("[Sheet] SNAP pos:", pos, "target:", target);
+        Animated.spring(y, {
+          toValue: target,
+          useNativeDriver: false,
+          damping: 20,
+          stiffness: 180,
+        }).start();
       },
     }),
   ).current;
 
   return (
-    <Animated.View
-      style={[styles.root, { transform: [{ translateY }] }]}
-      onLayout={onLayout}
-    >
-      {floatingButton && (
-        <View style={styles.floatingWrap}>{floatingButton}</View>
-      )}
-      <View {...panResponder.panHandlers}>
-        <View style={styles.handleWrap}>
-          <View style={styles.handle} />
-        </View>
+    <Animated.View style={[styles.root, { top: y }]}>
+      <View {...panResponder.panHandlers} style={styles.dragZone}>
+        <View style={styles.handle} />
       </View>
       {children}
     </Animated.View>
   );
+}
+
+function closestSnap(pos: number): number {
+  let best = SNAP_Y[0];
+  let bestDist = Math.abs(pos - best);
+  for (let i = 1; i < SNAP_Y.length; i++) {
+    const d = Math.abs(pos - SNAP_Y[i]);
+    if (d < bestDist) {
+      bestDist = d;
+      best = SNAP_Y[i];
+    }
+  }
+  return best;
 }
 
 const styles = StyleSheet.create({
@@ -119,21 +101,15 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 12,
   },
-  floatingWrap: {
-    position: "absolute",
-    top: -56,
-    right: 16,
-    zIndex: 20,
-  },
-  handleWrap: {
+  dragZone: {
+    height: 48,
     alignItems: "center",
-    paddingTop: 10,
-    paddingBottom: 6,
+    justifyContent: "center",
   },
   handle: {
     width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#ddd",
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#ccc",
   },
 });
