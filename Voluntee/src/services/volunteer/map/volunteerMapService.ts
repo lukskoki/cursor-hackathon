@@ -1,9 +1,11 @@
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+} from "firebase/firestore";
+import { getFirebaseFirestore } from "@/services/shared/firebaseApp";
 import type { VolunteerEvent, EventCategory } from "@/types/volunteer/event";
-import { MOCK_MAP_EVENTS } from "./mockMapData";
-
-function delay(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 function haversineKm(
   lat1: number,
@@ -24,10 +26,35 @@ function haversineKm(
 
 export type MapEvent = VolunteerEvent & { distanceKm: number };
 
+const EVENTS_COLLECTION = "events";
+
+function docToEvent(id: string, data: Record<string, unknown>): VolunteerEvent {
+  return {
+    id,
+    title: data.title as string,
+    description: data.description as string,
+    category: data.category as EventCategory,
+    tags: data.tags as string[],
+    address: data.address as string,
+    latitude: data.latitude as number,
+    longitude: data.longitude as number,
+    startsAt: data.startsAt as string,
+    durationMinutes: data.durationMinutes as number,
+    volunteersNeeded: data.volunteersNeeded as number,
+    volunteersApplied: data.volunteersApplied as number,
+    points: data.points as number,
+    organizerName: data.organizerName as string,
+    organizerId: (data.organizerId as string) ?? "",
+    createdAt: (data.createdAt as string) ?? "",
+  };
+}
+
 export const volunteerMapService = {
   getById: async (id: string): Promise<VolunteerEvent | null> => {
-    await delay(100);
-    return MOCK_MAP_EVENTS.find((e) => e.id === id) ?? null;
+    const db = getFirebaseFirestore();
+    const snap = await getDoc(doc(db, EVENTS_COLLECTION, id));
+    if (!snap.exists()) return null;
+    return docToEvent(snap.id, snap.data() as Record<string, unknown>);
   },
 
   getNearby: async (opts: {
@@ -37,12 +64,15 @@ export const volunteerMapService = {
     search?: string;
     radiusKm?: number;
   }): Promise<MapEvent[]> => {
-    await delay(200);
-
     const { userLat, userLon, category, search, radiusKm = 10 } = opts;
     const q = (search ?? "").toLowerCase().trim();
 
-    let events: VolunteerEvent[] = MOCK_MAP_EVENTS;
+    const db = getFirebaseFirestore();
+    const snap = await getDocs(collection(db, EVENTS_COLLECTION));
+
+    let events: VolunteerEvent[] = snap.docs.map((d) =>
+      docToEvent(d.id, d.data() as Record<string, unknown>),
+    );
 
     if (category) {
       events = events.filter((e) => e.category === category);

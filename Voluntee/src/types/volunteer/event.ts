@@ -20,6 +20,8 @@ export type VolunteerEvent = {
   volunteersApplied: number;
   points: number;
   organizerName: string;
+  organizerId?: string;
+  createdAt?: string;
 };
 
 export const CATEGORY_LABELS: Record<EventCategory, string> = {

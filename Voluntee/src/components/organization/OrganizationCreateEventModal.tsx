@@ -9,16 +9,19 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { colors } from "@/theme/colors";
 import { spacing } from "@/theme/spacing";
+import { useCreateEvent } from "@/hooks/organization/events/useCreateEvent";
 
 type OrganizationCreateEventModalProps = {
   visible: boolean;
   onClose: () => void;
   organizationName: string;
+  onCreated?: () => void;
 };
 
 type CategoryId = "environment" | "social" | "animals" | "education";
@@ -34,13 +37,25 @@ const CATEGORIES: {
   { id: "education", label: "Education", icon: "school" },
 ];
 
+function parseDateTimeToISO(dateStr: string, timeStr: string): string {
+  const cleaned = dateStr.replace(",", "");
+  const combined = `${cleaned} ${timeStr}`;
+  const parsed = new Date(combined);
+  if (!isNaN(parsed.getTime())) return parsed.toISOString();
+  return new Date().toISOString();
+}
+
 export function OrganizationCreateEventModal({
   visible,
   onClose,
   organizationName,
+  onCreated,
 }: OrganizationCreateEventModalProps) {
   const insets = useSafeAreaInsets();
+  const { create, loading, error } = useCreateEvent();
+
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [category, setCategory] = useState<CategoryId>("environment");
   const [locationQuery, setLocationQuery] = useState("");
   const [dateStr, setDateStr] = useState("Mar 28, 2026");
@@ -51,6 +66,7 @@ export function OrganizationCreateEventModal({
   useEffect(() => {
     if (!visible) return;
     setTitle("");
+    setDescription("");
     setCategory("environment");
     setLocationQuery("");
     setDateStr("Mar 28, 2026");
@@ -58,6 +74,34 @@ export function OrganizationCreateEventModal({
     setLimitStr("12");
     setPointsXp("450");
   }, [visible]);
+
+  async function handleSubmit() {
+    if (!title.trim()) return;
+
+    const volunteersNeeded = parseInt(limitStr, 10) || 12;
+    const points = parseInt(pointsXp, 10) || 15;
+    const startsAt = parseDateTimeToISO(dateStr, timeStr);
+
+    const id = await create({
+      title: title.trim(),
+      description: description.trim() || title.trim(),
+      category,
+      tags: [category],
+      address: locationQuery.trim() || "Zagreb, Croatia",
+      latitude: 45.815,
+      longitude: 15.9819,
+      startsAt,
+      durationMinutes: 180,
+      volunteersNeeded,
+      volunteersApplied: 0,
+      points,
+    });
+
+    if (id) {
+      onCreated?.();
+      onClose();
+    }
+  }
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
@@ -101,6 +145,16 @@ export function OrganizationCreateEventModal({
             placeholderTextColor={colors.muted}
             value={title}
             onChangeText={setTitle}
+          />
+
+          <Text style={styles.label}>DESCRIPTION</Text>
+          <TextInput
+            style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
+            placeholder="Describe the volunteer opportunity..."
+            placeholderTextColor={colors.muted}
+            value={description}
+            onChangeText={setDescription}
+            multiline
           />
 
           <Text style={styles.label}>CATEGORY</Text>
@@ -192,14 +246,23 @@ export function OrganizationCreateEventModal({
             </View>
           </View>
 
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
           <Pressable
-            style={styles.submit}
-            onPress={onClose}
+            style={[styles.submit, loading && styles.submitDisabled]}
+            onPress={handleSubmit}
+            disabled={loading}
             accessibilityRole="button"
             accessibilityLabel="Post opportunity"
           >
-            <Text style={styles.submitText}>Post Opportunity</Text>
-            <Ionicons name="rocket-outline" size={20} color="#fff" />
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Text style={styles.submitText}>Post Opportunity</Text>
+                <Ionicons name="rocket-outline" size={20} color="#fff" />
+              </>
+            )}
           </Pressable>
           <Text style={styles.legal}>BY POSTING, YOU AGREE TO COMMUNITY GUIDELINES</Text>
         </ScrollView>
@@ -331,6 +394,13 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   pointsXpSuffix: { fontSize: 15, fontWeight: "800", color: colors.primary, marginLeft: 4 },
+  errorText: {
+    color: "#D32F2F",
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: spacing.md,
+  },
   submit: {
     marginTop: spacing.xl,
     backgroundColor: colors.primary,
@@ -341,6 +411,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: spacing.sm,
   },
+  submitDisabled: { opacity: 0.6 },
   submitText: { color: "#fff", fontSize: 17, fontWeight: "800" },
   legal: {
     marginTop: spacing.md,

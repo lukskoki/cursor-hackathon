@@ -11,9 +11,12 @@ import {
   Keyboard,
   Platform,
   useWindowDimensions,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+import { useRecommendedEvents } from "@/hooks/volunteer/home/useRecommendedEvents";
+import type { VolunteerEvent } from "@/services/volunteer/home/volunteerHomeService";
 
 const ACTIVE_BLUE = "#208AEF";
 
@@ -61,40 +64,23 @@ type Opportunity = {
   };
 };
 
-const MOCK_OPPORTUNITIES: Opportunity[] = [
-  {
-    id: "1",
-    description: "Sadnja stabala i uređenje parka.",
-    location: "Maksimir, Zagreb",
-    hours: "4 h",
-    category: "Environment",
-    author: { kind: "organization", name: "Zagreb Eco-Watch" },
-  },
-  {
-    id: "2",
-    description: "Šetnje pasa i pomoć u skloništu.",
-    location: "Dumovec, Zagreb",
-    hours: "3 h",
-    category: "Animals",
-    author: { kind: "organization", name: "Sklonište Dumovec" },
-  },
-  {
-    id: "3",
-    description: "Druženje i pomoć u domu za starije.",
-    location: "Tresnjevka, Zagreb",
-    hours: "2 h",
-    category: "Social",
-    author: { kind: "individual", name: "Ivan Ivić" },
-  },
-  {
-    id: "4",
-    description: "Sortiranje donacija u banci hrane.",
-    location: "Centar, Zagreb",
-    hours: "5 h",
-    category: "Community",
-    author: { kind: "organization", name: "Hrvatski Crveni križ" },
-  },
-];
+function eventToOpportunity(e: VolunteerEvent): Opportunity {
+  const hours = e.durationMinutes >= 60
+    ? `${Math.round(e.durationMinutes / 60)} h`
+    : `${e.durationMinutes} min`;
+
+  return {
+    id: e.id,
+    description: e.title || e.description,
+    location: e.address,
+    hours,
+    category: e.category || "Community",
+    author: {
+      kind: "organization",
+      name: e.organizerName || "Unknown",
+    },
+  };
+}
 
 function authorInitials(displayName: string): string {
   const parts = displayName.trim().split(/\s+/).filter(Boolean);
@@ -222,10 +208,14 @@ export default function VolunteerHome() {
     Math.max(0, contentWidth - 38),
   );
 
+  const { events: rawEvents, loading, error } = useRecommendedEvents();
+  const opportunities = useMemo(
+    () => rawEvents.map(eventToOpportunity),
+    [rawEvents],
+  );
+
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  /** Kad je true, sakriven je naslov — odmah false pri zatvaranju da se Voluntee vrati. */
   const [searchOpen, setSearchOpen] = useState(false);
-  /** Traka ostaje montirana dok traje animacija sužavanja do 0. */
   const [searchBarMounted, setSearchBarMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<TextInput>(null);
@@ -234,8 +224,8 @@ export default function VolunteerHome() {
   const filtered = useMemo(() => {
     let list =
       selectedCategory === "All"
-        ? MOCK_OPPORTUNITIES
-        : MOCK_OPPORTUNITIES.filter((o) => o.category === selectedCategory);
+        ? opportunities
+        : opportunities.filter((o) => o.category === selectedCategory);
 
     const q = searchQuery.trim().toLowerCase();
     if (q) {
@@ -246,7 +236,7 @@ export default function VolunteerHome() {
       );
     }
     return list;
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, opportunities]);
 
   const openSearch = useCallback(() => {
     if (searchOpen || searchBarMounted) return;
@@ -305,6 +295,15 @@ export default function VolunteerHome() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator size="large" color={ACTIVE_BLUE} style={{ marginTop: 40 }} />
+          ) : error ? (
+            <Text style={styles.emptyText}>Failed to load events.</Text>
+          ) : (
+            <Text style={styles.emptyText}>No upcoming events found.</Text>
+          )
+        }
         onScrollBeginDrag={() => {
           if (searchOpen || searchBarMounted) handleOutsideSearch();
         }}
@@ -510,6 +509,12 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: "#fff",
+  },
+  emptyText: {
+    textAlign: "center",
+    color: "#888",
+    fontSize: 15,
+    marginTop: 40,
   },
   card: {
     flexDirection: "row",

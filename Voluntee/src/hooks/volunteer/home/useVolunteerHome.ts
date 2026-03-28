@@ -1,3 +1,6 @@
+import { useRecommendedEvents } from "./useRecommendedEvents";
+
 export function useVolunteerHome() {
-  return { data: null, loading: false, refetch: async () => {} };
+  const { events, loading, error, refetch } = useRecommendedEvents();
+  return { data: events, loading, error, refetch };
 }
