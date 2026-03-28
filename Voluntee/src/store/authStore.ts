@@ -1,11 +1,19 @@
 import { create } from "zustand";
 
+export type UserRole = "volunteer" | "organization";
+
 type AuthState = {
-  token: string | null;
-  setToken: (t: string | null) => void;
+  isLoggedIn: boolean;
+  role: UserRole | null;
+  email: string | null;
+  signIn: (email: string, role: UserRole) => void;
+  signOut: () => void;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
-  token: null,
-  setToken: (token) => set({ token }),
+  isLoggedIn: false,
+  role: null,
+  email: null,
+  signIn: (email, role) => set({ isLoggedIn: true, email, role }),
+  signOut: () => set({ isLoggedIn: false, email: null, role: null }),
 }));
