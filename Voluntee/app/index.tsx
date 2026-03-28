@@ -5,7 +5,7 @@ export default function Index() {
   const { isLoggedIn, role } = useAuthStore();
 
   if (!isLoggedIn) {
-    return <Redirect href="/shared/auth/login" />;
+    return <Redirect href="/shared/onboarding/welcome" />;
   }
 
   if (role === "organization") {
