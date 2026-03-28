@@ -139,7 +139,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    height: SCREEN_H,
+    bottom: 0,
+    zIndex: 20,
     backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -147,7 +148,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
-    elevation: 12,
+    elevation: 20,
   },
   floatingWrap: {
     position: "absolute",

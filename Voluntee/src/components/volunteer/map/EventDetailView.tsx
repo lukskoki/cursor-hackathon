@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import { useState, useRef, useCallback } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet, Animated } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { VolunteerEvent, EventCategory } from "@/types/volunteer/event";
 import { CATEGORY_LABELS } from "@/types/volunteer/event";
@@ -52,6 +52,35 @@ type Props = {
 
 export function EventDetailView({ event, onBack, onApply }: Props) {
   const [liked, setLiked] = useState(false);
+  const heartScale = useRef(new Animated.Value(1)).current;
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastTranslateY = useRef(new Animated.Value(6)).current;
+
+  const toggleLike = useCallback(() => {
+    const next = !liked;
+    setLiked(next);
+
+    Animated.sequence([
+      Animated.timing(heartScale, { toValue: 1.4, duration: 120, useNativeDriver: true }),
+      Animated.timing(heartScale, { toValue: 1, duration: 120, useNativeDriver: true }),
+    ]).start();
+
+    if (next) {
+      toastOpacity.setValue(0);
+      toastTranslateY.setValue(6);
+      Animated.parallel([
+        Animated.timing(toastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(toastTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]).start(() => {
+        setTimeout(() => {
+          Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+        }, 1200);
+      });
+    } else {
+      toastOpacity.setValue(0);
+    }
+  }, [liked, heartScale, toastOpacity, toastTranslateY]);
+
   const color = CAT_COLOR[event.category];
   const spotsLeft = event.volunteersNeeded - event.volunteersApplied;
   const spotsPct = (event.volunteersApplied / event.volunteersNeeded) * 100;
@@ -59,6 +88,7 @@ export function EventDetailView({ event, onBack, onApply }: Props) {
   return (
     <View style={styles.root}>
       <ScrollView
+        style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -79,13 +109,25 @@ export function EventDetailView({ event, onBack, onApply }: Props) {
         <View style={styles.body}>
           <View style={styles.titleRow}>
             <Text style={styles.title}>{event.title}</Text>
-            <Pressable onPress={() => setLiked((p) => !p)} style={styles.likeBtn}>
-              <Ionicons
-                name={liked ? "heart" : "heart-outline"}
-                size={24}
-                color={liked ? "#FF3B30" : "#999"}
-              />
-            </Pressable>
+            <View style={styles.likeWrap}>
+              <Pressable onPress={toggleLike} style={styles.likeBtn}>
+                <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+                  <Ionicons
+                    name={liked ? "heart" : "heart-outline"}
+                    size={24}
+                    color={liked ? "#FF3B30" : "#999"}
+                  />
+                </Animated.View>
+              </Pressable>
+              <Animated.Text
+                style={[
+                  styles.likeToast,
+                  { opacity: toastOpacity, transform: [{ translateY: toastTranslateY }] },
+                ]}
+              >
+                Added to liked
+              </Animated.Text>
+            </View>
           </View>
           <View style={styles.organizerRow}>
             <Ionicons name="business-outline" size={14} color="#888" />
@@ -139,16 +181,18 @@ export function EventDetailView({ event, onBack, onApply }: Props) {
         </View>
       </ScrollView>
 
-      <Pressable
-        style={[styles.applyBtn, spotsLeft <= 0 && styles.applyBtnDisabled]}
-        disabled={spotsLeft <= 0}
-        onPress={() => onApply(event.id)}
-      >
-        <Ionicons name="hand-left" size={18} color="#fff" />
-        <Text style={styles.applyText}>
-          {spotsLeft > 0 ? "Apply to Volunteer" : "Fully Booked"}
-        </Text>
-      </Pressable>
+      <View style={styles.applyWrap}>
+        <Pressable
+          style={[styles.applyBtn, spotsLeft <= 0 && styles.applyBtnDisabled]}
+          disabled={spotsLeft <= 0}
+          onPress={() => onApply(event.id)}
+        >
+          <Ionicons name="hand-left" size={18} color="#fff" />
+          <Text style={styles.applyText}>
+            {spotsLeft > 0 ? "Apply to Volunteer" : "Fully Booked"}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -167,7 +211,8 @@ function InfoItem({ icon, label, value }: { icon: IconName; label: string; value
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scrollContent: { paddingBottom: 100 },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 20 },
 
   heroBanner: {
     alignItems: "center",
@@ -214,7 +259,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: { fontSize: 22, fontWeight: "700", color: "#111", marginBottom: 6, flex: 1 },
+  likeWrap: { alignItems: "center" },
   likeBtn: { paddingTop: 4 },
+  likeToast: { fontSize: 11, color: "#FF3B30", fontWeight: "500", marginTop: 2 },
   organizerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -272,6 +319,14 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "700", color: "#111", marginBottom: 6 },
   description: { fontSize: 14, lineHeight: 21, color: "#444" },
 
+  applyWrap: {
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 30,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+  },
   applyBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -279,8 +334,6 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: "#208AEF",
     paddingVertical: 14,
-    marginHorizontal: 20,
-    marginBottom: 8,
     borderRadius: 14,
   },
   applyBtnDisabled: { backgroundColor: "#ccc" },
