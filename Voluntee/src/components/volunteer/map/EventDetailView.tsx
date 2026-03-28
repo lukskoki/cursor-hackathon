@@ -52,6 +52,8 @@ type Props = {
 
 export function EventDetailView({ event, onBack, onApply }: Props) {
   const [liked, setLiked] = useState(false);
+  const [applied, setApplied] = useState(false);
+  const btnScale = useRef(new Animated.Value(1)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTranslateY = useRef(new Animated.Value(6)).current;
@@ -182,16 +184,36 @@ export function EventDetailView({ event, onBack, onApply }: Props) {
       </ScrollView>
 
       <View style={styles.applyWrap}>
-        <Pressable
-          style={[styles.applyBtn, spotsLeft <= 0 && styles.applyBtnDisabled]}
-          disabled={spotsLeft <= 0}
-          onPress={() => onApply(event.id)}
-        >
-          <Ionicons name="hand-left" size={18} color="#fff" />
-          <Text style={styles.applyText}>
-            {spotsLeft > 0 ? "Apply to Volunteer" : "Fully Booked"}
-          </Text>
-        </Pressable>
+        <Animated.View style={{ transform: [{ scale: btnScale }] }}>
+          <Pressable
+            style={[
+              styles.applyBtn,
+              applied && styles.applyBtnSuccess,
+              spotsLeft <= 0 && !applied && styles.applyBtnDisabled,
+            ]}
+            disabled={spotsLeft <= 0 || applied}
+            onPress={() => {
+              setApplied(true);
+              Animated.sequence([
+                Animated.timing(btnScale, { toValue: 0.92, duration: 100, useNativeDriver: true }),
+                Animated.timing(btnScale, { toValue: 1, duration: 150, useNativeDriver: true }),
+              ]).start();
+            }}
+          >
+            <Ionicons
+              name={applied ? "checkmark-circle" : "hand-left"}
+              size={applied ? 22 : 18}
+              color="#fff"
+            />
+            <Text style={styles.applyText}>
+              {applied
+                ? "Successfully Applied!"
+                : spotsLeft > 0
+                  ? "Apply to Volunteer"
+                  : "Fully Booked"}
+            </Text>
+          </Pressable>
+        </Animated.View>
       </View>
     </View>
   );
@@ -336,6 +358,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
   },
+  applyBtnSuccess: { backgroundColor: "#34C759" },
   applyBtnDisabled: { backgroundColor: "#ccc" },
   applyText: { fontSize: 15, fontWeight: "700", color: "#fff" },
 });
