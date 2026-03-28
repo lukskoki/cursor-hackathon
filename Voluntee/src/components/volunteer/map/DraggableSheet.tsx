@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, type ReactNode } from "react";
 import {
   View,
   Animated,
@@ -14,11 +14,12 @@ const TOP_Y = Math.min(...SNAP_Y);
 const BOTTOM_Y = Math.max(...SNAP_Y);
 const INITIAL_Y = SNAP_Y[1];
 
-console.log("[Sheet] SCREEN_H:", SCREEN_H, "SNAP_Y:", SNAP_Y, "TOP_Y:", TOP_Y, "BOTTOM_Y:", BOTTOM_Y, "INITIAL_Y:", INITIAL_Y);
+type Props = {
+  children: ReactNode;
+  floatingButton?: ReactNode;
+};
 
-type Props = { children: React.ReactNode };
-
-export function DraggableSheet({ children }: Props) {
+export function DraggableSheet({ children, floatingButton }: Props) {
   const y = useRef(new Animated.Value(INITIAL_Y)).current;
   const lastPos = useRef(INITIAL_Y);
 
@@ -35,24 +36,18 @@ export function DraggableSheet({ children }: Props) {
       onMoveShouldSetPanResponderCapture: (_, gs) => Math.abs(gs.dy) > 4,
 
       onPanResponderGrant: () => {
-        console.log("[Sheet] GRANT lastPos:", lastPos.current);
         y.setOffset(lastPos.current);
         y.setValue(0);
       },
 
       onPanResponderMove: Animated.event([null, { dy: y }], {
         useNativeDriver: false,
-        listener: (_: unknown, gs: { dy: number }) => {
-          console.log("[Sheet] MOVE dy:", gs.dy, "lastPos:", lastPos.current);
-        },
       }),
 
-      onPanResponderRelease: (_: unknown, gs: { dy: number; vy: number }) => {
+      onPanResponderRelease: () => {
         y.flattenOffset();
-        console.log("[Sheet] RELEASE gs.dy:", gs.dy, "lastPos:", lastPos.current);
         const pos = Math.max(TOP_Y, Math.min(BOTTOM_Y, lastPos.current));
         const target = closestSnap(pos);
-        console.log("[Sheet] SNAP pos:", pos, "target:", target);
         Animated.spring(y, {
           toValue: target,
           useNativeDriver: false,
@@ -65,6 +60,11 @@ export function DraggableSheet({ children }: Props) {
 
   return (
     <Animated.View style={[styles.root, { top: y }]}>
+      {floatingButton && (
+        <View style={styles.floatingWrap} pointerEvents="box-none">
+          {floatingButton}
+        </View>
+      )}
       <View {...panResponder.panHandlers} style={styles.dragZone}>
         <View style={styles.handle} />
       </View>
@@ -100,6 +100,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 12,
+  },
+  floatingWrap: {
+    position: "absolute",
+    top: -56,
+    right: 16,
+    zIndex: 20,
   },
   dragZone: {
     height: 48,

@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, FlatList } from "react-native";
+import { View, Text, StyleSheet, FlatList, type ReactNode } from "react-native";
 import type { MapEvent } from "@/services/volunteer/map/volunteerMapService";
 import { NearbyEventCard } from "./NearbyEventCard";
 import { DraggableSheet } from "./DraggableSheet";
@@ -9,6 +9,7 @@ type Props = {
   loading: boolean;
   searchQuery: string;
   onEventPress: (id: string) => void;
+  floatingButton?: ReactNode;
 };
 
 export function NearbySheet({
@@ -17,13 +18,14 @@ export function NearbySheet({
   loading,
   searchQuery,
   onEventPress,
+  floatingButton,
 }: Props) {
   const headerText = searchQuery
     ? `${events.length} result${events.length === 1 ? "" : "s"} for "${searchQuery}"`
     : `${events.length} opportunit${events.length === 1 ? "y" : "ies"} within ${radiusKm}km`;
 
   return (
-    <DraggableSheet>
+    <DraggableSheet floatingButton={floatingButton}>
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
           <Text style={styles.sectionTitle}>Nearby Activities</Text>

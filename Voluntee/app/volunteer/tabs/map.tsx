@@ -1,6 +1,8 @@
-import { StyleSheet, ActivityIndicator, View } from "react-native";
+import { useRef, useCallback } from "react";
+import { StyleSheet, ActivityIndicator, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView from "react-native-maps";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
 import { useVolunteerMap } from "@/hooks/volunteer/map/useVolunteerMap";
@@ -10,6 +12,7 @@ import { EventMarker } from "@/components/volunteer/map/EventMarker";
 import { NearbySheet } from "@/components/volunteer/map/NearbySheet";
 
 export default function VolunteerMap() {
+  const mapRef = useRef<MapView>(null);
   const {
     events,
     loading,
@@ -18,10 +21,19 @@ export default function VolunteerMap() {
     selectedCategory,
     selectedEventId,
     searchQuery,
+    userLocation,
     setCategory,
     selectEvent,
     setSearch,
   } = useVolunteerMap();
+
+  const handleCenterOnUser = useCallback(() => {
+    if (!userLocation || !mapRef.current) return;
+    mapRef.current.animateToRegion(
+      { ...region, latitude: userLocation.latitude, longitude: userLocation.longitude },
+      400,
+    );
+  }, [userLocation, region]);
 
   const handleEventPress = (id: string) => {
     router.push(`/volunteer/events/${id}`);
@@ -30,6 +42,7 @@ export default function VolunteerMap() {
   return (
     <View style={styles.root}>
       <MapView
+        ref={mapRef}
         style={StyleSheet.absoluteFill}
         initialRegion={region}
         showsUserLocation
@@ -67,6 +80,13 @@ export default function VolunteerMap() {
         loading={loading}
         searchQuery={searchQuery}
         onEventPress={handleEventPress}
+        floatingButton={
+          userLocation ? (
+            <Pressable style={styles.locateBtn} onPress={handleCenterOnUser}>
+              <Ionicons name="locate" size={22} color="#208AEF" />
+            </Pressable>
+          ) : undefined
+        }
       />
     </View>
   );
@@ -86,5 +106,18 @@ const styles = StyleSheet.create({
     top: "50%",
     alignSelf: "center",
     zIndex: 5,
+  },
+  locateBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });
