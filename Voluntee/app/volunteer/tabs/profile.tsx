@@ -5,7 +5,12 @@ import { authService } from "@/services/shared/authService";
 import { useAuthStore } from "@/store/authStore";
 
 export default function VolunteerProfile() {
-  const email = useAuthStore((s) => s.user?.email ?? "");
+  const user = useAuthStore((s) => s.user);
+  const email = user?.email?.trim() ?? "";
+  const displayName =
+    user?.role === "volunteer" ? user.displayName.trim() : "";
+  const avatarSource = displayName || email || "V";
+  const avatarLetter = avatarSource.charAt(0).toUpperCase();
 
   const handleLogout = async () => {
     await authService.signOutUser();
@@ -18,10 +23,12 @@ export default function VolunteerProfile() {
       <Text style={styles.heading}>Profile</Text>
 
       <View style={styles.avatar}>
-        <Text style={styles.avatarTxt}>{(email ?? "V")[0].toUpperCase()}</Text>
+        <Text style={styles.avatarTxt}>{avatarLetter}</Text>
       </View>
 
-      <Text style={styles.email}>{email}</Text>
+      <Text style={styles.email}>
+        {email || "Not signed in (preview)"}
+      </Text>
 
       <View style={styles.stats}>
         <Stat label="Points" value="0" />

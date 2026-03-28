@@ -94,6 +94,17 @@ export default function Welcome() {
         </View>
 
         <View style={styles.footer}>
+          {/* TODO(dev): remove this block before release */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.devBtn,
+              pressed && styles.ctaPressed,
+            ]}
+            onPress={() => router.replace("/volunteer/tabs/home")}
+          >
+            <Text style={styles.devBtnText}>[DEV] Skip to volunteer home</Text>
+          </Pressable>
+
           <Text style={styles.footerText}>
             ZAGREB VOLUNTEER NETWORK • 2026
           </Text>
@@ -248,6 +259,22 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
+    gap: spacing.md,
+    alignItems: "center",
+  },
+  devBtn: {
+    borderWidth: 2,
+    borderColor: "#d97706",
+    borderStyle: "dashed",
+    borderRadius: 10,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: "#fffbeb",
+  },
+  devBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#b45309",
   },
   footerText: {
     fontSize: 11,
