@@ -11,6 +11,7 @@ import {
   Keyboard,
   Platform,
   useWindowDimensions,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -18,41 +19,32 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import Svg, { Path } from "react-native-svg";
 
 import type { EventCategory, VolunteerEvent } from "@/types/volunteer/event";
-import { MOCK_MAP_EVENTS } from "@/services/volunteer/map/mockMapData";
-import { useVolunteerAppliedStore } from "@/store/volunteerAppliedStore";
+import { useRecommendedEvents } from "@/hooks/volunteer/home/useRecommendedEvents";
 
 const ACTIVE_BLUE = "#208AEF";
 
 const CATEGORIES = ["All", "Environment", "Animals", "Social", "Community"] as const;
 
-/** Isti redoslijed kao prije: okoliš, životinje, društvo, zajednica — ID-evi iz mape. */
-const HOME_FEED_IDS = ["evt-1", "evt-3", "evt-4", "evt-5"] as const;
-
-const HOME_FEED_EVENTS: VolunteerEvent[] = HOME_FEED_IDS.map((id) => {
-  const e = MOCK_MAP_EVENTS.find((x) => x.id === id);
-  return e!;
-}).filter(Boolean);
-
-const CATEGORY_THEME: Record<EventCategory, { accent: string; labelHr: string }> = {
+const CATEGORY_THEME: Record<EventCategory, { accent: string; label: string }> = {
   environment: {
     accent: "#2D9D78",
-    labelHr: "Okoliš",
+    label: "Environment",
   },
   animals: {
     accent: "#C45C26",
-    labelHr: "Životinje",
+    label: "Animals",
   },
   social: {
     accent: "#7C5CE6",
-    labelHr: "Društvo",
+    label: "Social",
   },
   community: {
     accent: ACTIVE_BLUE,
-    labelHr: "Zajednica",
+    label: "Community",
   },
   education: {
     accent: "#208AEF",
-    labelHr: "Obrazovanje",
+    label: "Education",
   },
 };
 
@@ -161,7 +153,6 @@ function HomeFeedCard({ event }: { event: VolunteerEvent }) {
   const theme = getCategoryTheme(event.category);
   const metaIconColor = "#94a3b8";
   const orgName = event.organizerName;
-  const isApplied = useVolunteerAppliedStore((s) => !!s.appliedIds[event.id]);
 
   return (
     <View
@@ -176,23 +167,11 @@ function HomeFeedCard({ event }: { event: VolunteerEvent }) {
 
       <View style={styles.cardMain}>
         <View style={styles.cardBody}>
-          <View style={styles.cardHeadRow}>
-            <Text style={[styles.description, styles.cardHeadTitle]} numberOfLines={2}>
-              {event.title}
-            </Text>
-            {isApplied ? (
-              <View
-                style={[styles.appliedPill, { backgroundColor: `${theme.accent}1F` }]}
-              >
-                <Ionicons name="checkmark-circle" size={14} color={theme.accent} />
-                <Text style={[styles.appliedPillText, { color: theme.accent }]}>
-                  Prijavljeno
-                </Text>
-              </View>
-            ) : null}
-          </View>
+          <Text style={[styles.description, styles.cardHeadTitle]} numberOfLines={2}>
+            {event.title}
+          </Text>
           <Text style={[styles.categoryLine, { color: theme.accent }]}>
-            {theme.labelHr}
+            {theme.label}
           </Text>
           <View style={styles.metaBlock}>
             <View style={styles.metaRow}>
@@ -223,7 +202,7 @@ function HomeFeedCard({ event }: { event: VolunteerEvent }) {
               </Text>
             </View>
             <View style={styles.authorTextCol}>
-              <Text style={styles.authorKind}>Organizacija</Text>
+              <Text style={styles.authorKind}>Organization</Text>
               <Text style={styles.authorName} numberOfLines={2}>
                 {orgName}
               </Text>
@@ -254,17 +233,17 @@ export default function VolunteerHome() {
     Math.max(0, contentWidth - 38),
   );
 
+  const { events: feedEvents, loading, error } = useRecommendedEvents();
+
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  /** Kad je true, sakriven je naslov — odmah false pri zatvaranju da se Voluntee vrati. */
   const [searchOpen, setSearchOpen] = useState(false);
-  /** Traka ostaje montirana dok traje animacija sužavanja do 0. */
   const [searchBarMounted, setSearchBarMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<TextInput>(null);
   const searchWidthAnim = useRef(new Animated.Value(0)).current;
 
   const filtered = useMemo(() => {
-    let list = [...HOME_FEED_EVENTS];
+    let list = [...feedEvents];
     const chipCat = CHIP_TO_EVENT_CATEGORY[selectedCategory];
     if (chipCat != null) {
       list = list.filter((e) => e.category === chipCat);
@@ -279,7 +258,7 @@ export default function VolunteerHome() {
       );
     }
     return list;
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, feedEvents]);
 
   const openSearch = useCallback(() => {
     if (searchOpen || searchBarMounted) return;
@@ -338,6 +317,17 @@ export default function VolunteerHome() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator size="large" color={ACTIVE_BLUE} style={{ marginTop: 40 }} />
+          ) : error ? (
+            <Text style={styles.emptyText}>
+              {`Failed to load events.\n${error.message}`}
+            </Text>
+          ) : (
+            <Text style={styles.emptyText}>No upcoming events found.</Text>
+          )
+        }
         onScrollBeginDrag={() => {
           if (searchOpen || searchBarMounted) handleOutsideSearch();
         }}
@@ -476,7 +466,6 @@ const styles = StyleSheet.create({
     color: "#111",
     letterSpacing: -0.3,
   },
-  /** Samo lupe — bez obruba (obrub je samo na `searchField`). Krajnje desno. */
   searchIconBtn: {
     padding: 6,
     marginLeft: 2,
@@ -503,7 +492,6 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  /** Bez obruba/sjene/pozadine dok se traka sužava — vizualno u ikonu. */
   searchFieldClosing: {
     borderWidth: 0,
     backgroundColor: "transparent",
@@ -545,6 +533,12 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: "#fff",
+  },
+  emptyText: {
+    textAlign: "center",
+    color: "#888",
+    fontSize: 15,
+    marginTop: 40,
   },
   card: {
     flexDirection: "row",

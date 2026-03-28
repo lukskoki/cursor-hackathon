@@ -3,9 +3,6 @@ import { volunteerProfileService } from "@/services/volunteer/profile/volunteerP
 import { useAuthStore } from "@/store/authStore";
 import type { VolunteerProfileDetail } from "@/types/volunteer/profile";
 
-/**
- * Učitava profil volontera iz Firestorea; ponavlja učitavanje kad se promijeni prijavljeni korisnik.
- */
 export function useVolunteerProfile() {
   const hydrated = useAuthStore((s) => s.hydrated);
   const user = useAuthStore((s) => s.user);

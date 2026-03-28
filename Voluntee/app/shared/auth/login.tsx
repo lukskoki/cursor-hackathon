@@ -67,6 +67,13 @@ export default function Login() {
         />
 
         <Pressable
+          style={styles.forgotWrap}
+          onPress={() => router.push("/shared/auth/forgot-password")}
+        >
+          <Text style={styles.forgotTxt}>Forgot password?</Text>
+        </Pressable>
+
+        <Pressable
           style={[styles.loginBtn, loading && styles.btnDisabled]}
           onPress={handleLogin}
           disabled={loading}
@@ -173,4 +180,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   linkInline: { fontSize: 15, color: "#208AEF", fontWeight: "600" },
+  forgotWrap: { alignItems: "flex-end" },
+  forgotTxt: { fontSize: 14, color: "#208AEF", fontWeight: "600" },
 });

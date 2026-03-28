@@ -23,6 +23,8 @@ export const MOCK_MAP_EVENTS: VolunteerEvent[] = [
     volunteersApplied: 8,
     points: 25,
     organizerName: "Zeleni Zagreb",
+    organizerId: "",
+    createdAt: "2026-03-20T12:00:00Z",
   },
   {
     id: "evt-2",
@@ -39,6 +41,8 @@ export const MOCK_MAP_EVENTS: VolunteerEvent[] = [
     volunteersApplied: 2,
     points: 15,
     organizerName: "Knjižnica Zagreb",
+    organizerId: "",
+    createdAt: "2026-03-21T10:00:00Z",
   },
   {
     id: "evt-3",
@@ -55,6 +59,8 @@ export const MOCK_MAP_EVENTS: VolunteerEvent[] = [
     volunteersApplied: 6,
     points: 20,
     organizerName: "Azil Dumovec",
+    organizerId: "",
+    createdAt: "2026-03-22T08:00:00Z",
   },
   {
     id: "evt-4",
@@ -71,6 +77,8 @@ export const MOCK_MAP_EVENTS: VolunteerEvent[] = [
     volunteersApplied: 3,
     points: 20,
     organizerName: "Caritas Zagreb",
+    organizerId: "",
+    createdAt: "2026-03-23T14:00:00Z",
   },
   {
     id: "evt-5",
@@ -87,6 +95,8 @@ export const MOCK_MAP_EVENTS: VolunteerEvent[] = [
     volunteersApplied: 12,
     points: 30,
     organizerName: "Crveni Križ Zagreb",
+    organizerId: "",
+    createdAt: "2026-03-24T11:00:00Z",
   },
   {
     id: "evt-6",
@@ -103,6 +113,8 @@ export const MOCK_MAP_EVENTS: VolunteerEvent[] = [
     volunteersApplied: 4,
     points: 25,
     organizerName: "Zeleni Zagreb",
+    organizerId: "",
+    createdAt: "2026-03-25T09:00:00Z",
   },
   {
     id: "evt-7",
@@ -119,5 +131,7 @@ export const MOCK_MAP_EVENTS: VolunteerEvent[] = [
     volunteersApplied: 1,
     points: 15,
     organizerName: "Učilište Zagreb",
+    organizerId: "",
+    createdAt: "2026-03-26T16:00:00Z",
   },
 ];

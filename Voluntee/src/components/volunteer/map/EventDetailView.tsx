@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, Animated } from "react-native";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet, Animated, ActivityIndicator } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { VolunteerEvent, EventCategory } from "@/types/volunteer/event";
 import { CATEGORY_LABELS } from "@/types/volunteer/event";
+import { useApplyToEvent } from "@/hooks/volunteer/events/useApplyToEvent";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -52,7 +53,7 @@ type Props = {
 
 export function EventDetailView({ event, onBack, onApply }: Props) {
   const [liked, setLiked] = useState(false);
-  const [applied, setApplied] = useState(false);
+  const { apply, loading: applyLoading, error: applyError, applied, checking } = useApplyToEvent(event.id);
   const btnScale = useRef(new Animated.Value(1)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
   const toastOpacity = useRef(new Animated.Value(0)).current;
@@ -191,26 +192,32 @@ export function EventDetailView({ event, onBack, onApply }: Props) {
               applied && styles.applyBtnSuccess,
               spotsLeft <= 0 && !applied && styles.applyBtnDisabled,
             ]}
-            disabled={spotsLeft <= 0 || applied}
+            disabled={spotsLeft <= 0 || applied || applyLoading || checking}
             onPress={() => {
-              setApplied(true);
               Animated.sequence([
                 Animated.timing(btnScale, { toValue: 0.92, duration: 100, useNativeDriver: true }),
                 Animated.timing(btnScale, { toValue: 1, duration: 150, useNativeDriver: true }),
               ]).start();
+              void apply();
             }}
           >
-            <Ionicons
-              name={applied ? "checkmark-circle" : "hand-left"}
-              size={applied ? 22 : 18}
-              color="#fff"
-            />
+            {applyLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons
+                name={applied ? "checkmark-circle" : "hand-left"}
+                size={applied ? 22 : 18}
+                color="#fff"
+              />
+            )}
             <Text style={styles.applyText}>
-              {applied
-                ? "Successfully Applied!"
-                : spotsLeft > 0
-                  ? "Apply to Volunteer"
-                  : "Fully Booked"}
+              {applyLoading
+                ? "Applying..."
+                : applied
+                  ? "Successfully Applied!"
+                  : spotsLeft > 0
+                    ? "Apply to Volunteer"
+                    : "Fully Booked"}
             </Text>
           </Pressable>
         </Animated.View>
