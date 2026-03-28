@@ -8,7 +8,7 @@ import {
 } from "react-native";
 
 const SCREEN_H = Dimensions.get("window").height;
-const SNAP_FRACTIONS = [0.12, 0.42, 0.85];
+const SNAP_FRACTIONS = [0.20, 0.42, 0.85];
 const SNAP_Y = SNAP_FRACTIONS.map((f) => SCREEN_H * (1 - f));
 const TOP_Y = Math.min(...SNAP_Y);
 const BOTTOM_Y = Math.max(...SNAP_Y);
@@ -16,10 +16,11 @@ const INITIAL_Y = SNAP_Y[1];
 
 type Props = {
   children: ReactNode;
+  header?: ReactNode;
   floatingButton?: ReactNode;
 };
 
-export function DraggableSheet({ children, floatingButton }: Props) {
+export function DraggableSheet({ children, header, floatingButton }: Props) {
   const y = useRef(new Animated.Value(INITIAL_Y)).current;
   const lastPos = useRef(INITIAL_Y);
 
@@ -65,8 +66,11 @@ export function DraggableSheet({ children, floatingButton }: Props) {
           {floatingButton}
         </View>
       )}
-      <View {...panResponder.panHandlers} style={styles.dragZone}>
-        <View style={styles.handle} />
+      <View {...panResponder.panHandlers}>
+        <View style={styles.dragZone}>
+          <View style={styles.handle} />
+        </View>
+        {header}
       </View>
       {children}
     </Animated.View>

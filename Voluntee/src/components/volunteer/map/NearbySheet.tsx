@@ -25,18 +25,21 @@ export function NearbySheet({
     : `${events.length} opportunit${events.length === 1 ? "y" : "ies"} within ${radiusKm}km`;
 
   return (
-    <DraggableSheet floatingButton={floatingButton}>
-      <View style={styles.headerRow}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.sectionTitle}>Nearby Activities</Text>
-          <Text style={styles.subtitle}>{headerText}</Text>
+    <DraggableSheet
+      floatingButton={floatingButton}
+      header={
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.sectionTitle}>Nearby Activities</Text>
+            <Text style={styles.subtitle}>{headerText}</Text>
+          </View>
+          <View style={styles.liveBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveTxt}>Live</Text>
+          </View>
         </View>
-        <View style={styles.liveBadge}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveTxt}>Live</Text>
-        </View>
-      </View>
-
+      }
+    >
       <FlatList
         data={events}
         keyExtractor={(e) => e.id}
@@ -85,7 +88,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#208AEF",
   },
   liveTxt: { fontSize: 11, fontWeight: "600", color: "#208AEF" },
-  list: { paddingHorizontal: 20, gap: 10, paddingBottom: 40 },
+  list: { paddingHorizontal: 20, gap: 10, paddingBottom: 160 },
   empty: { paddingTop: 40, alignItems: "center" },
   emptyTxt: { fontSize: 15, color: "#aaa" },
 });
