@@ -1,10 +1,7 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { MapEvent } from "@/services/volunteer/map/volunteerMapService";
-import {
-  CATEGORY_LABELS,
-  type EventCategory,
-} from "@/types/volunteer/event";
+import type { EventCategory } from "@/types/volunteer/event";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 

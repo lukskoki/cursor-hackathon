@@ -10,40 +10,53 @@ import type { RegisterOrganizationInput, RegisterVolunteerInput } from "@/types/
 
 export function useAuthBootstrap() {
   useEffect(() => {
-    const { setUser, setHydrated, setFirebaseConfigured } =
+    const { setUser, setHydrated, setFirebaseConfigured, setDevOrganizationBypass } =
       useAuthStore.getState();
 
     if (!isFirebaseConfigured()) {
       setFirebaseConfigured(false);
+      setDevOrganizationBypass(false);
       setUser(null);
       setHydrated(true);
       return;
     }
 
-    setFirebaseConfigured(true);
-    const auth = getFirebaseAuth();
-
-    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        if (!firebaseUser) {
-          setUser(null);
-        } else {
-          const profile = await fetchUserProfileWithRetry(firebaseUser.uid);
-          if (!profile) {
-            await firebaseSignOut(auth);
-            setUser(null);
+    let unsub: (() => void) | undefined;
+    try {
+      setFirebaseConfigured(true);
+      const auth = getFirebaseAuth();
+      unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+        try {
+          if (!firebaseUser) {
+            if (!useAuthStore.getState().devOrganizationBypass) {
+              setUser(null);
+            }
           } else {
-            setUser(profile);
+            const profile = await fetchUserProfileWithRetry(firebaseUser.uid);
+            if (!profile) {
+              await firebaseSignOut(auth);
+              setDevOrganizationBypass(false);
+              setUser(null);
+            } else {
+              setDevOrganizationBypass(false);
+              setUser(profile);
+            }
           }
+        } catch {
+          setDevOrganizationBypass(false);
+          setUser(null);
+        } finally {
+          setHydrated(true);
         }
-      } catch {
-        setUser(null);
-      } finally {
-        setHydrated(true);
-      }
-    });
+      });
+    } catch {
+      setFirebaseConfigured(false);
+      setDevOrganizationBypass(false);
+      setUser(null);
+      setHydrated(true);
+    }
 
-    return () => unsub();
+    return () => unsub?.();
   }, []);
 }
 
@@ -62,6 +75,7 @@ export function useLogin() {
     setLoading(true);
     try {
       const profile = await authService.signIn(email, password);
+      useAuthStore.getState().setDevOrganizationBypass(false);
       useAuthStore.getState().setUser(profile);
       router.replace(
         profile.role === "organization"
@@ -93,6 +107,7 @@ export function useRegisterVolunteer() {
     setLoading(true);
     try {
       const profile = await authService.registerVolunteer(input);
+      useAuthStore.getState().setDevOrganizationBypass(false);
       useAuthStore.getState().setUser(profile);
       router.replace("/volunteer/tabs/home");
     } catch (e) {
@@ -120,6 +135,7 @@ export function useRegisterOrganization() {
     setLoading(true);
     try {
       const profile = await authService.registerOrganization(input);
+      useAuthStore.getState().setDevOrganizationBypass(false);
       useAuthStore.getState().setUser(profile);
       router.replace("/organization/tabs/dashboard");
     } catch (e) {

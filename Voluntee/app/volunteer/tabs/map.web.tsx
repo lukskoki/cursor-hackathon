@@ -1,42 +1,30 @@
-import { useRef, useState, useCallback } from "react";
-import { StyleSheet, ActivityIndicator, View, Pressable } from "react-native";
+import { useState } from "react";
+import { StyleSheet, ActivityIndicator, View, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView from "react-native-maps";
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
 import type { VolunteerEvent } from "@/types/volunteer/event";
 import { useVolunteerMap } from "@/hooks/volunteer/map/useVolunteerMap";
 import { MapHeader } from "@/components/volunteer/map/MapHeader";
 import { CategoryFilters } from "@/components/volunteer/map/CategoryFilters";
-import { EventMarker } from "@/components/volunteer/map/EventMarker";
 import { NearbySheet } from "@/components/volunteer/map/NearbySheet";
 
-/** Default (iOS / Android). Web uses `map.web.tsx`. */
-export default function VolunteerMap() {
-  const mapRef = useRef<MapView>(null);
+/**
+ * Web override for `map.tsx` (react-native-maps is not supported on web).
+ * Reuse search, filters, and the bottom sheet so the volunteer flow still works in the browser.
+ */
+export default function VolunteerMapWeb() {
   const [selectedEvent, setSelectedEvent] = useState<VolunteerEvent | null>(null);
   const {
     events,
     loading,
-    region,
     radiusKm,
     selectedCategory,
     selectedEventId,
     searchQuery,
-    userLocation,
     setCategory,
-    selectEvent,
     setSearch,
   } = useVolunteerMap();
-
-  const handleCenterOnUser = useCallback(() => {
-    if (!userLocation || !mapRef.current) return;
-    mapRef.current.animateToRegion(
-      { ...region, latitude: userLocation.latitude, longitude: userLocation.longitude },
-      400,
-    );
-  }, [userLocation, region]);
 
   const handleEventPress = (id: string) => {
     const evt = events.find((e) => e.id === id);
@@ -49,26 +37,21 @@ export default function VolunteerMap() {
     router.push(`/volunteer/events/apply?id=${id}`);
   };
 
+  const highlightId = selectedEvent?.id ?? selectedEventId;
+
   return (
     <View style={styles.root}>
-      <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFill}
-        initialRegion={region}
-        showsUserLocation
-        showsMyLocationButton={false}
-      >
-        {events.map((evt) => (
-          <EventMarker
-            key={evt.id}
-            latitude={evt.latitude}
-            longitude={evt.longitude}
-            category={evt.category}
-            isSelected={evt.id === selectedEventId}
-            onPress={() => selectEvent(evt.id)}
-          />
-        ))}
-      </MapView>
+      <View style={styles.mapPlaceholder} pointerEvents="none">
+        <Text style={styles.mapHint}>Map preview</Text>
+        <Text style={styles.mapSub}>
+          The live map runs on iOS and Android. On web, use search and the list below.
+        </Text>
+        {highlightId ? (
+          <Text style={styles.mapSub} numberOfLines={2}>
+            Selected: {events.find((e) => e.id === highlightId)?.title ?? highlightId}
+          </Text>
+        ) : null}
+      </View>
 
       {loading && (
         <View style={styles.loader} pointerEvents="none">
@@ -77,10 +60,7 @@ export default function VolunteerMap() {
       )}
 
       <SafeAreaView edges={["top"]} style={styles.overlay} pointerEvents="box-none">
-        <MapHeader
-          searchQuery={searchQuery}
-          onSearchChange={setSearch}
-        />
+        <MapHeader searchQuery={searchQuery} onSearchChange={setSearch} />
         <CategoryFilters selected={selectedCategory} onSelect={setCategory} />
       </SafeAreaView>
 
@@ -93,13 +73,7 @@ export default function VolunteerMap() {
         selectedEvent={selectedEvent}
         onBack={handleDetailBack}
         onApply={handleApply}
-        floatingButton={
-          userLocation && !selectedEvent ? (
-            <Pressable style={styles.locateBtn} onPress={handleCenterOnUser}>
-              <Ionicons name="locate" size={22} color="#208AEF" />
-            </Pressable>
-          ) : undefined
-        }
+        floatingButton={undefined}
       />
     </View>
   );
@@ -107,6 +81,25 @@ export default function VolunteerMap() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  mapPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#E8EEF4",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  mapHint: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#334155",
+    marginBottom: 8,
+  },
+  mapSub: {
+    fontSize: 14,
+    color: "#64748B",
+    textAlign: "center",
+    lineHeight: 20,
+  },
   overlay: {
     position: "absolute",
     top: 0,
@@ -119,18 +112,5 @@ const styles = StyleSheet.create({
     top: "50%",
     alignSelf: "center",
     zIndex: 5,
-  },
-  locateBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
   },
 });

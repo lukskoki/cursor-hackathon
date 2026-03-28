@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import * as Location from "expo-location";
 import type { EventCategory } from "@/types/volunteer/event";
 import {
@@ -57,10 +57,15 @@ export function useVolunteerMap() {
     };
   }, []);
 
-  const coords = userLocation ?? {
-    latitude: ZAGREB_CENTER.latitude,
-    longitude: ZAGREB_CENTER.longitude,
-  };
+  const defaultCoords = useMemo(
+    () => ({
+      latitude: ZAGREB_CENTER.latitude,
+      longitude: ZAGREB_CENTER.longitude,
+    }),
+    [],
+  );
+
+  const coords = userLocation ?? defaultCoords;
 
   const region = {
     latitude: coords.latitude,
@@ -99,7 +104,7 @@ export function useVolunteerMap() {
       fetchEvents(selectedCategory, searchQuery, coords);
     }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [selectedCategory, searchQuery, coords.latitude, coords.longitude, locationLoading, fetchEvents]);
+  }, [selectedCategory, searchQuery, coords, locationLoading, fetchEvents]);
 
   const handleCategoryChange = useCallback((cat: EventCategory | null) => {
     setSelectedCategory(cat);

@@ -12,6 +12,7 @@ import {
 import { router } from "expo-router";
 import { useLogin } from "@/hooks/shared/useAuth";
 import { useAuthStore } from "@/store/authStore";
+import { enterDevOrganizationDashboard } from "@/utils/dev/enterDevOrganization";
 
 export default function Login() {
   const firebaseConfigured = useAuthStore((s) => s.firebaseConfigured);
@@ -100,6 +101,15 @@ export default function Login() {
             <Text style={styles.linkInline}>Sign up as organization</Text>
           </Pressable>
         </View>
+
+        {__DEV__ ? (
+          <Pressable
+            style={styles.devBypass}
+            onPress={() => enterDevOrganizationDashboard()}
+          >
+            <Text style={styles.devBypassTxt}>[DEV] Open organizer dashboard</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -173,4 +183,16 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   linkInline: { fontSize: 15, color: "#208AEF", fontWeight: "600" },
+  devBypass: {
+    marginTop: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: "#208AEF",
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+  },
+  devBypassTxt: { fontSize: 13, fontWeight: "700", color: "#1D4ED8" },
 });
