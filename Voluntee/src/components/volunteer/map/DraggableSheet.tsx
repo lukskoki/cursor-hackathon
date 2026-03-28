@@ -13,12 +13,14 @@ const SCREEN_H = Dimensions.get("window").height;
 type Props = {
   snapFractions?: number[];
   initialSnap?: number;
+  floatingButton?: React.ReactNode;
   children: React.ReactNode;
 };
 
 export function DraggableSheet({
   snapFractions = [0.12, 0.42, 0.85],
   initialSnap = 1,
+  floatingButton,
   children,
 }: Props) {
   const snapPoints = snapFractions.map((f) => SCREEN_H * (1 - f));
@@ -88,10 +90,14 @@ export function DraggableSheet({
     <Animated.View
       style={[styles.root, { transform: [{ translateY }] }]}
       onLayout={onLayout}
-      {...panResponder.panHandlers}
     >
-      <View style={styles.handleWrap}>
-        <View style={styles.handle} />
+      {floatingButton && (
+        <View style={styles.floatingWrap}>{floatingButton}</View>
+      )}
+      <View {...panResponder.panHandlers}>
+        <View style={styles.handleWrap}>
+          <View style={styles.handle} />
+        </View>
       </View>
       {children}
     </Animated.View>
@@ -112,6 +118,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 12,
+  },
+  floatingWrap: {
+    position: "absolute",
+    top: -56,
+    right: 16,
+    zIndex: 20,
   },
   handleWrap: {
     alignItems: "center",

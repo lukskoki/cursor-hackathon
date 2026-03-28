@@ -1,5 +1,5 @@
 import type { VolunteerEvent, EventCategory } from "@/types/volunteer/event";
-import { MOCK_MAP_EVENTS, ZAGREB_CENTER } from "./mockMapData";
+import { MOCK_MAP_EVENTS } from "./mockMapData";
 
 function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -26,15 +26,15 @@ export type MapEvent = VolunteerEvent & { distanceKm: number };
 
 export const volunteerMapService = {
   getNearby: async (opts: {
+    userLat: number;
+    userLon: number;
     category?: EventCategory | null;
     search?: string;
     radiusKm?: number;
   }): Promise<MapEvent[]> => {
     await delay(200);
 
-    const { category, search, radiusKm = 10 } = opts;
-    const userLat = ZAGREB_CENTER.latitude;
-    const userLon = ZAGREB_CENTER.longitude;
+    const { userLat, userLon, category, search, radiusKm = 10 } = opts;
     const q = (search ?? "").toLowerCase().trim();
 
     let events: VolunteerEvent[] = MOCK_MAP_EVENTS;

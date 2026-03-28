@@ -1,6 +1,8 @@
-import { StyleSheet, ActivityIndicator, View } from "react-native";
+import { useRef, useCallback } from "react";
+import { StyleSheet, ActivityIndicator, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView from "react-native-maps";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 
 import { useVolunteerMap } from "@/hooks/volunteer/map/useVolunteerMap";
@@ -10,6 +12,8 @@ import { EventMarker } from "@/components/volunteer/map/EventMarker";
 import { NearbySheet } from "@/components/volunteer/map/NearbySheet";
 
 export default function VolunteerMap() {
+  const mapRef = useRef<MapView>(null);
+
   const {
     events,
     loading,
@@ -18,6 +22,7 @@ export default function VolunteerMap() {
     selectedCategory,
     selectedEventId,
     searchQuery,
+    userLocation,
     setCategory,
     selectEvent,
     setSearch,
@@ -27,9 +32,29 @@ export default function VolunteerMap() {
     router.push(`/volunteer/events/${id}`);
   };
 
+  const handleCenterOnUser = useCallback(() => {
+    if (!userLocation || !mapRef.current) return;
+    mapRef.current.animateToRegion(
+      {
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      },
+      600,
+    );
+  }, [userLocation]);
+
+  const locationButton = (
+    <Pressable style={styles.myLocationBtn} onPress={handleCenterOnUser}>
+      <Ionicons name="navigate" size={20} color="#208AEF" />
+    </Pressable>
+  );
+
   return (
     <View style={styles.root}>
       <MapView
+        ref={mapRef}
         style={StyleSheet.absoluteFill}
         initialRegion={region}
         showsUserLocation
@@ -67,6 +92,7 @@ export default function VolunteerMap() {
         loading={loading}
         searchQuery={searchQuery}
         onEventPress={handleEventPress}
+        floatingButton={locationButton}
       />
     </View>
   );
@@ -86,5 +112,18 @@ const styles = StyleSheet.create({
     top: "50%",
     alignSelf: "center",
     zIndex: 5,
+  },
+  myLocationBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
   },
 });
