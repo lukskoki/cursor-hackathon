@@ -45,10 +45,10 @@ export function DraggableSheet({ children, header, floatingButton }: Props) {
         useNativeDriver: false,
       }),
 
-      onPanResponderRelease: () => {
+      onPanResponderRelease: (_, gs) => {
         y.flattenOffset();
         const pos = Math.max(TOP_Y, Math.min(BOTTOM_Y, lastPos.current));
-        const target = closestSnap(pos);
+        const target = closestSnap(pos, gs.vy);
         Animated.spring(y, {
           toValue: target,
           useNativeDriver: false,
@@ -77,7 +77,27 @@ export function DraggableSheet({ children, header, floatingButton }: Props) {
   );
 }
 
-function closestSnap(pos: number): number {
+const VY_THRESHOLD = 0.5;
+
+function closestSnap(pos: number, vy: number): number {
+  const sorted = [...SNAP_Y].sort((a, b) => a - b);
+
+  if (Math.abs(vy) > VY_THRESHOLD) {
+    if (vy < 0) {
+      // Swiping up (negative vy) -> go to next snap above (smaller Y)
+      for (let i = sorted.length - 1; i >= 0; i--) {
+        if (sorted[i] < pos - 10) return sorted[i];
+      }
+      return sorted[0];
+    } else {
+      // Swiping down (positive vy) -> go to next snap below (larger Y)
+      for (let i = 0; i < sorted.length; i++) {
+        if (sorted[i] > pos + 10) return sorted[i];
+      }
+      return sorted[sorted.length - 1];
+    }
+  }
+
   let best = SNAP_Y[0];
   let bestDist = Math.abs(pos - best);
   for (let i = 1; i < SNAP_Y.length; i++) {
