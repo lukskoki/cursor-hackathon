@@ -1,19 +1,23 @@
 import { create } from "zustand";
+import { isFirebaseConfigured } from "@/config/firebaseEnv";
+import type { UserProfile } from "@/types/shared/user";
 
-export type UserRole = "volunteer" | "organization";
+export type { UserRole } from "@/types/shared/user";
 
 type AuthState = {
-  isLoggedIn: boolean;
-  role: UserRole | null;
-  email: string | null;
-  signIn: (email: string, role: UserRole) => void;
-  signOut: () => void;
+  hydrated: boolean;
+  firebaseConfigured: boolean;
+  user: UserProfile | null;
+  setUser: (user: UserProfile | null) => void;
+  setHydrated: (hydrated: boolean) => void;
+  setFirebaseConfigured: (configured: boolean) => void;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
-  isLoggedIn: false,
-  role: null,
-  email: null,
-  signIn: (email, role) => set({ isLoggedIn: true, email, role }),
-  signOut: () => set({ isLoggedIn: false, email: null, role: null }),
+  hydrated: false,
+  firebaseConfigured: isFirebaseConfigured(),
+  user: null,
+  setUser: (user) => set({ user }),
+  setHydrated: (hydrated) => set({ hydrated }),
+  setFirebaseConfigured: (firebaseConfigured) => set({ firebaseConfigured }),
 }));
