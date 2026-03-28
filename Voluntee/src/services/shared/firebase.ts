@@ -10,7 +10,6 @@ import { getFirestore, type Firestore } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
-// Metro učitava RN build; javni TypeScript tipovi često ne izvoze getReactNativePersistence.
 const { getReactNativePersistence } = require("@firebase/auth") as {
   getReactNativePersistence: (storage: typeof AsyncStorage) => Persistence;
 };

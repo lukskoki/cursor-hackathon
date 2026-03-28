@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  ScrollView,
   Pressable,
   ActivityIndicator,
   StyleSheet,
@@ -21,6 +22,7 @@ import {
 } from "firebase/firestore";
 
 import { getFirebaseFirestore } from "@/services/shared/firebaseApp";
+import { useEventCompletion } from "@/hooks/organization/events/useEventCompletion";
 
 type Applicant = {
   id: string;
@@ -30,12 +32,13 @@ type Applicant = {
   appliedAt: string;
 };
 
-type FilterTab = "all" | "pending" | "accepted" | "rejected";
+type FilterTab = "all" | "pending" | "accepted" | "rejected" | "completed";
 
 const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: "all", label: "All" },
   { key: "pending", label: "Pending" },
   { key: "accepted", label: "Accepted" },
+  { key: "completed", label: "Completed" },
   { key: "rejected", label: "Rejected" },
 ];
 
@@ -44,6 +47,7 @@ export default function ManageApplicants() {
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>("all");
+  const { completeVolunteer, completeAll, loading: completing } = useEventCompletion();
 
   const fetchApplicants = useCallback(async () => {
     if (!id) return;
@@ -81,6 +85,64 @@ export default function ManageApplicants() {
     }
   };
 
+  const handleCompleteVolunteer = (applicant: Applicant) => {
+    if (!id) return;
+    Alert.alert(
+      "Mark Complete",
+      `Award points and mark ${applicant.userEmail} as completed?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Complete",
+          onPress: async () => {
+            try {
+              await completeVolunteer(applicant.id, id, applicant.userId);
+              setApplicants((prev) =>
+                prev.map((a) =>
+                  a.id === applicant.id ? { ...a, status: "completed" } : a,
+                ),
+              );
+            } catch {
+              Alert.alert("Error", "Failed to mark volunteer as completed.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleCompleteAll = () => {
+    if (!id) return;
+    const acceptedCount = applicants.filter((a) => a.status === "accepted").length;
+    if (acceptedCount === 0) {
+      Alert.alert("No Volunteers", "There are no accepted volunteers to complete.");
+      return;
+    }
+    Alert.alert(
+      "Complete All",
+      `Mark all ${acceptedCount} accepted volunteer${acceptedCount === 1 ? "" : "s"} as completed and award points?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Complete All",
+          onPress: async () => {
+            try {
+              const count = await completeAll(id);
+              setApplicants((prev) =>
+                prev.map((a) =>
+                  a.status === "accepted" ? { ...a, status: "completed" } : a,
+                ),
+              );
+              Alert.alert("Done", `${count} volunteer${count === 1 ? "" : "s"} marked as completed.`);
+            } catch {
+              Alert.alert("Error", "Failed to complete volunteers.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const filtered =
     filter === "all"
       ? applicants
@@ -90,6 +152,7 @@ export default function ManageApplicants() {
     all: applicants.length,
     pending: applicants.filter((a) => a.status === "pending").length,
     accepted: applicants.filter((a) => a.status === "accepted").length,
+    completed: applicants.filter((a) => a.status === "completed").length,
     rejected: applicants.filter((a) => a.status === "rejected").length,
   };
 
@@ -105,7 +168,11 @@ export default function ManageApplicants() {
         </View>
       </SafeAreaView>
 
-      <View style={styles.filterRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterRow}
+      >
         {FILTER_TABS.map((tab) => {
           const active = filter === tab.key;
           return (
@@ -125,7 +192,26 @@ export default function ManageApplicants() {
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
+
+      {counts.accepted > 0 && (
+        <View style={styles.completeAllRow}>
+          <Pressable
+            style={[styles.completeAllBtn, completing && { opacity: 0.6 }]}
+            onPress={handleCompleteAll}
+            disabled={completing}
+          >
+            {completing ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="checkmark-done" size={18} color="#fff" />
+            )}
+            <Text style={styles.completeAllText}>
+              Complete All Accepted ({counts.accepted})
+            </Text>
+          </Pressable>
+        </View>
+      )}
 
       {loading ? (
         <View style={styles.center}>
@@ -152,6 +238,7 @@ export default function ManageApplicants() {
               applicant={item}
               onAccept={() => handleUpdateStatus(item.id, "accepted")}
               onReject={() => handleUpdateStatus(item.id, "rejected")}
+              onComplete={() => handleCompleteVolunteer(item)}
             />
           )}
         />
@@ -164,17 +251,21 @@ function ApplicantCard({
   applicant,
   onAccept,
   onReject,
+  onComplete,
 }: {
   applicant: Applicant;
   onAccept: () => void;
   onReject: () => void;
+  onComplete: () => void;
 }) {
   const statusColor =
-    applicant.status === "accepted"
+    applicant.status === "completed"
       ? "#34C759"
-      : applicant.status === "rejected"
-        ? "#FF3B30"
-        : "#FF9500";
+      : applicant.status === "accepted"
+        ? "#208AEF"
+        : applicant.status === "rejected"
+          ? "#FF3B30"
+          : "#FF9500";
 
   const initials = applicant.userEmail.substring(0, 2).toUpperCase();
   const appliedDate = applicant.appliedAt
@@ -222,6 +313,14 @@ function ApplicantCard({
           <Pressable onPress={onReject} style={styles.rejectBtn}>
             <Ionicons name="close" size={20} color="#fff" />
             <Text style={styles.actionBtnText}>Reject</Text>
+          </Pressable>
+        </View>
+      )}
+      {applicant.status === "accepted" && (
+        <View style={styles.actions}>
+          <Pressable onPress={onComplete} style={styles.completeSingleBtn}>
+            <Ionicons name="checkmark-circle" size={20} color="#fff" />
+            <Text style={styles.actionBtnText}>Mark Complete</Text>
           </Pressable>
         </View>
       )}
@@ -328,4 +427,33 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   actionBtnText: { fontSize: 14, fontWeight: "600", color: "#fff" },
+
+  completeSingleBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#34C759",
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  completeAllRow: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  completeAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#34C759",
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  completeAllText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#fff",
+  },
 });

@@ -16,7 +16,7 @@ export type Application = {
   eventId: string;
   userId: string;
   userEmail: string;
-  status: "pending" | "accepted" | "rejected";
+  status: "pending" | "accepted" | "rejected" | "completed";
   appliedAt: string;
 };
 

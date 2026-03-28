@@ -40,7 +40,7 @@ type FirestoreApplication = {
   eventId: string;
   userId: string;
   userEmail: string;
-  status: "pending" | "accepted" | "rejected";
+  status: "pending" | "accepted" | "rejected" | "completed";
   appliedAt: string;
 };
 
@@ -146,7 +146,7 @@ function buildStats(
   const pendingCount = events.filter(
     (e) => deriveEventStatus(e.startsAt, e.durationMinutes) === "upcoming",
   ).length;
-  const acceptedCount = applications.filter((a) => a.status === "accepted").length;
+  const acceptedCount = applications.filter((a) => a.status === "accepted" || a.status === "completed").length;
   const totalApplicants = applications.length;
 
   return {

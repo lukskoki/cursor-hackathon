@@ -7,9 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const TAB_BAR_HEIGHT = 60;
 const TAB_BAR_BOTTOM_GAP = 0;
-/** Lijevo/desno od roditelja tab bara → 90% širine, uvijek centrirano unutar navigatora. */
 const TAB_BAR_SIDE_MARGIN = "5%";
-/** Pomak tab bara prema dolje (manji `bottom` u RN = niže na ekranu). */
 const TAB_BAR_DROP_PX = 5;
 const ACTIVE_BLUE = "#208AEF";
 const INACTIVE_GRAY = "#999999";
@@ -66,11 +64,6 @@ function GlassTabBarButton(props: BottomTabBarButtonProps) {
   );
 }
 
-/**
- * Mora postojati (ne smije biti null) da React Navigation ne crta default sivu karticu.
- * Potpuno prozirno — vidi se samo sadržaj tabova.
- */
-/** Bijela kapsula + samo rub; vanjski RN tab wrapper ostaje potpuno proziran (nema sive trake). */
 function TabBarPillBackground() {
   return <View style={styles.barPillBg} pointerEvents="none" />;
 }

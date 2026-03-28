@@ -14,7 +14,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import type { VolunteerEvent, EventCategory } from "@/types/volunteer/event";
 import { CATEGORY_LABELS } from "@/types/volunteer/event";
 import { volunteerMapService } from "@/services/volunteer/map/volunteerMapService";
-import { useVolunteerAppliedStore } from "@/store/volunteerAppliedStore";
+import { useApplyToEvent } from "@/hooks/volunteer/events/useApplyToEvent";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -62,10 +62,7 @@ export default function VolunteerEventDetail() {
   const [loading, setLoading] = useState(true);
   const [favorite, setFavorite] = useState(false);
   const [appliedToastVisible, setAppliedToastVisible] = useState(false);
-  const markApplied = useVolunteerAppliedStore((s) => s.markApplied);
-  const userHasApplied = useVolunteerAppliedStore(
-    (s) => !!(id && s.appliedIds[id]),
-  );
+  const { apply, loading: applyLoading, applied: userHasApplied } = useApplyToEvent(id);
 
   useEffect(() => {
     setAppliedToastVisible(false);
@@ -83,10 +80,9 @@ export default function VolunteerEventDetail() {
     if (!appliedToastVisible) return;
     const t = setTimeout(() => {
       setAppliedToastVisible(false);
-      if (id) markApplied(id);
     }, 2200);
     return () => clearTimeout(t);
-  }, [appliedToastVisible, id, markApplied]);
+  }, [appliedToastVisible]);
 
   if (loading) {
     return (
@@ -242,10 +238,11 @@ export default function VolunteerEventDetail() {
             isFullyBooked && !userHasApplied && styles.applyBtnDisabled,
             userHasApplied && { backgroundColor: color },
           ]}
-          disabled={applyDisabled}
+          disabled={applyDisabled || applyLoading}
           onPress={() => {
             if (appliedToastVisible) return;
             setAppliedToastVisible(true);
+            void apply();
           }}
         >
           <Ionicons

@@ -13,19 +13,19 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { authService } from "@/services/shared/authService";
 import { useAuthStore } from "@/store/authStore";
 import { useVolunteerProfile } from "@/hooks/volunteer/profile/useVolunteerProfile";
+import { useVolunteerBadges } from "@/hooks/volunteer/profile/useVolunteerBadges";
 import { Loader } from "@/components/shared/Loader";
 import { ReviewCard } from "@/components/volunteer/ReviewCard";
 import { colors } from "@/theme/colors";
 import { spacing } from "@/theme/spacing";
-import type {
-  VolunteerPastActivity,
-  VolunteerProfileBadge,
-} from "@/types/volunteer/profile";
+import type { VolunteerPastActivity } from "@/types/volunteer/profile";
+import type { Badge } from "@/types/volunteer/badge";
 
 type ProfileTab = "activities" | "reviews" | "interests";
 
 export default function VolunteerProfile() {
   const { profile, loading, error } = useVolunteerProfile();
+  const { badges } = useVolunteerBadges();
   const [tab, setTab] = useState<ProfileTab>("activities");
 
   const handleLogout = async () => {
@@ -122,16 +122,19 @@ export default function VolunteerProfile() {
 
         <View style={styles.badgesHeader}>
           <Text style={styles.sectionTitle}>Unlocked Badges</Text>
-          <Pressable hitSlop={8}>
+          <Pressable
+            hitSlop={8}
+            onPress={() => router.push("/volunteer/badges")}
+          >
             <Text style={[styles.viewAll, { color: accent }]}>View All</Text>
           </Pressable>
         </View>
         <View style={styles.badgesRow}>
-          {profile.badges.length === 0 ? (
+          {badges.length === 0 ? (
             <Text style={styles.emptyHint}>No badges yet — join events to earn them.</Text>
           ) : (
-            profile.badges.map((b) => (
-              <ProfileBadgeIcon key={b.id} badge={b} accent={accent} />
+            badges.slice(0, 4).map((b) => (
+              <ProfileBadgeCard key={b.id} badge={b} accent={accent} />
             ))
           )}
         </View>
@@ -195,6 +198,16 @@ export default function VolunteerProfile() {
           </View>
         )}
 
+        <Pressable
+          style={styles.myAppsBtn}
+          onPress={() => router.push("/volunteer/events/my-applications")}
+          accessibilityRole="button"
+        >
+          <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+          <Text style={styles.myAppsBtnText}>My Applications</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.muted2} />
+        </Pressable>
+
         <Pressable style={styles.logoutBtn} onPress={handleLogout}>
           <Text style={styles.logoutTxt}>Log out</Text>
         </Pressable>
@@ -207,55 +220,50 @@ function formatNumber(n: number) {
   return n.toLocaleString("en-US");
 }
 
-function badgeIconName(
-  icon: VolunteerProfileBadge["icon"]
+function profileBadgeIconName(
+  icon: string,
 ): ComponentProps<typeof Ionicons>["name"] {
-  switch (icon) {
-    case "footprints":
-      return "footsteps";
-    case "helper":
-      return "diamond-outline";
-    case "leaf":
-      return "leaf-outline";
-    case "leader":
-      return "star-outline";
-    default:
-      return "ellipse-outline";
-  }
+  const map: Record<string, ComponentProps<typeof Ionicons>["name"]> = {
+    ribbon: "ribbon",
+    people: "people",
+    trophy: "trophy",
+    leaf: "leaf",
+    paw: "paw",
+  };
+  return map[icon] ?? "ellipse-outline";
 }
 
-function ProfileBadgeIcon({
+function ProfileBadgeCard({
   badge,
   accent,
 }: {
-  badge: VolunteerProfileBadge;
+  badge: Badge;
   accent: string;
 }) {
-  const unlocked = badge.unlocked;
   return (
     <View style={styles.badgeItem}>
       <View
         style={[
           styles.badgeCircle,
           {
-            backgroundColor: unlocked ? colors.surfaceBadge : "#ECECED",
-            opacity: unlocked ? 1 : 0.85,
+            backgroundColor: badge.unlocked ? colors.surfaceBadge : "#ECECED",
+            opacity: badge.unlocked ? 1 : 0.85,
           },
         ]}
       >
         <Ionicons
-          name={badgeIconName(badge.icon)}
+          name={profileBadgeIconName(badge.icon)}
           size={26}
-          color={unlocked ? accent : colors.muted2}
+          color={badge.unlocked ? accent : colors.muted2}
         />
-        {unlocked ? (
+        {badge.unlocked && (
           <View style={styles.badgeCheck}>
             <Ionicons name="checkmark" size={9} color="#fff" />
           </View>
-        ) : null}
+        )}
       </View>
       <Text
-        style={[styles.badgeName, !unlocked && { color: colors.muted2 }]}
+        style={[styles.badgeName, !badge.unlocked && { color: colors.muted2 }]}
         numberOfLines={1}
       >
         {badge.name}
@@ -611,9 +619,28 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
   },
   interestChipText: { fontSize: 14, fontWeight: "600", color: colors.text },
+  myAppsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: spacing.md,
+    marginTop: spacing.xl,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    gap: spacing.sm,
+  },
+  myAppsBtnText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.text,
+  },
   logoutBtn: {
     marginHorizontal: spacing.lg,
-    marginTop: spacing.xl,
+    marginTop: spacing.md,
     paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1.5,

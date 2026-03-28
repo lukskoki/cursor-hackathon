@@ -7,6 +7,10 @@ import {
   ActivityIndicator,
   StyleSheet,
   Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -23,8 +27,14 @@ import {
 } from "firebase/firestore";
 
 import { getFirebaseFirestore } from "@/services/shared/firebaseApp";
+import { useEventCompletion } from "@/hooks/organization/events/useEventCompletion";
+import { useAuthStore } from "@/store/authStore";
+import { useSubmitReview } from "@/hooks/shared/useReviews";
+import { reviewService } from "@/services/shared/reviewService";
+import { StarRating } from "@/components/shared/StarRating";
 import type { VolunteerEvent, EventCategory } from "@/types/volunteer/event";
 import { CATEGORY_LABELS } from "@/types/volunteer/event";
+import type { Review } from "@/types/shared/review";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -76,10 +86,20 @@ function formatDuration(mins: number) {
 
 export default function OrganizationEventDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const user = useAuthStore((s) => s.user);
   const [event, setEvent] = useState<VolunteerEvent | null>(null);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const { completeVolunteer, completeAll, loading: completing } = useEventCompletion();
+
+  const { submit: submitReview, loading: submittingReview } = useSubmitReview();
+  const [reviewTarget, setReviewTarget] = useState<Applicant | null>(null);
+  const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
+  const [reviewReliability, setReviewReliability] = useState(0);
+  const [reviewCommunication, setReviewCommunication] = useState(0);
+  const [reviewEffort, setReviewEffort] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -144,6 +164,122 @@ export default function OrganizationEventDetail() {
     );
   };
 
+  const handleCompleteVolunteer = (applicant: Applicant) => {
+    if (!id) return;
+    Alert.alert(
+      "Mark Complete",
+      `Award points and mark ${applicant.userEmail} as completed?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Complete",
+          onPress: async () => {
+            try {
+              await completeVolunteer(applicant.id, id, applicant.userId);
+              setApplicants((prev) =>
+                prev.map((a) =>
+                  a.id === applicant.id ? { ...a, status: "completed" } : a,
+                ),
+              );
+            } catch {
+              Alert.alert("Error", "Failed to mark volunteer as completed.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleCompleteAll = () => {
+    if (!id) return;
+    const acceptedCount = applicants.filter((a) => a.status === "accepted").length;
+    if (acceptedCount === 0) {
+      Alert.alert("No Volunteers", "There are no accepted volunteers to complete.");
+      return;
+    }
+    Alert.alert(
+      "Complete All",
+      `Mark all ${acceptedCount} accepted volunteer${acceptedCount === 1 ? "" : "s"} as completed and award points?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Complete All",
+          onPress: async () => {
+            try {
+              const count = await completeAll(id);
+              setApplicants((prev) =>
+                prev.map((a) =>
+                  a.status === "accepted" ? { ...a, status: "completed" } : a,
+                ),
+              );
+              Alert.alert("Done", `${count} volunteer${count === 1 ? "" : "s"} marked as completed.`);
+            } catch {
+              Alert.alert("Error", "Failed to complete volunteers.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  useEffect(() => {
+    if (!id || !user) return;
+    let cancelled = false;
+    (async () => {
+      const checked = new Set<string>();
+      for (const a of applicants.filter((x) => x.status === "accepted")) {
+        const done = await reviewService.hasReviewed(id, user.id + ":" + a.userId);
+        if (!cancelled && done) checked.add(a.userId);
+      }
+      if (!cancelled) setReviewedIds(checked);
+    })();
+    return () => { cancelled = true; };
+  }, [id, user, applicants]);
+
+  const openReviewModal = (applicant: Applicant) => {
+    setReviewTarget(applicant);
+    setReviewReliability(0);
+    setReviewCommunication(0);
+    setReviewEffort(0);
+    setReviewComment("");
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewTarget || !user || !id || !event) return;
+    const overallRating = Math.round(
+      (reviewReliability + reviewCommunication + reviewEffort) / 3,
+    );
+    if (overallRating === 0) {
+      Alert.alert("Rating Required", "Please rate at least one category.");
+      return;
+    }
+
+    const reviewerName =
+      user.role === "organization" ? user.organizationName : user.email;
+
+    const review: Omit<Review, "id"> = {
+      eventId: id,
+      reviewerId: user.id + ":" + reviewTarget.userId,
+      reviewerName,
+      reviewerRole: "organization",
+      targetId: reviewTarget.userId,
+      targetName: reviewTarget.userEmail,
+      rating: overallRating,
+      comment: reviewComment.trim(),
+      createdAt: new Date().toISOString(),
+      reliability: reviewReliability,
+      communication: reviewCommunication,
+      effort: reviewEffort,
+    };
+
+    const result = await submitReview(review);
+    if (result) {
+      setReviewedIds((prev) => new Set(prev).add(reviewTarget.userId));
+      setReviewTarget(null);
+      Alert.alert("Review Submitted", "Thank you for your feedback.");
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -171,7 +307,9 @@ export default function OrganizationEventDetail() {
       : 0;
 
   const pendingApplicants = applicants.filter((a) => a.status === "pending");
-  const decidedApplicants = applicants.filter((a) => a.status !== "pending");
+  const acceptedApplicants = applicants.filter((a) => a.status === "accepted");
+  const completedApplicants = applicants.filter((a) => a.status === "completed");
+  const rejectedApplicants = applicants.filter((a) => a.status === "rejected");
 
   return (
     <View style={styles.root}>
@@ -307,6 +445,23 @@ export default function OrganizationEventDetail() {
               </View>
             ) : (
               <>
+                {acceptedApplicants.length > 0 && (
+                  <Pressable
+                    style={[styles.completeAllBtn, completing && { opacity: 0.6 }]}
+                    onPress={handleCompleteAll}
+                    disabled={completing}
+                  >
+                    {completing ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Ionicons name="checkmark-done" size={18} color="#fff" />
+                    )}
+                    <Text style={styles.completeAllText}>
+                      Complete All ({acceptedApplicants.length})
+                    </Text>
+                  </Pressable>
+                )}
+
                 {pendingApplicants.length > 0 && (
                   <Text style={styles.subSectionLabel}>
                     Pending ({pendingApplicants.length})
@@ -321,12 +476,40 @@ export default function OrganizationEventDetail() {
                   />
                 ))}
 
-                {decidedApplicants.length > 0 && (
+                {acceptedApplicants.length > 0 && (
                   <Text style={styles.subSectionLabel}>
-                    Decided ({decidedApplicants.length})
+                    Accepted ({acceptedApplicants.length})
                   </Text>
                 )}
-                {decidedApplicants.slice(0, 3).map((a) => (
+                {acceptedApplicants.slice(0, 3).map((a) => (
+                  <ApplicantRow
+                    key={a.id}
+                    applicant={a}
+                    onComplete={() => handleCompleteVolunteer(a)}
+                    onReview={
+                      reviewedIds.has(a.userId)
+                        ? undefined
+                        : () => openReviewModal(a)
+                    }
+                    hasReview={reviewedIds.has(a.userId)}
+                  />
+                ))}
+
+                {completedApplicants.length > 0 && (
+                  <Text style={styles.subSectionLabel}>
+                    Completed ({completedApplicants.length})
+                  </Text>
+                )}
+                {completedApplicants.slice(0, 3).map((a) => (
+                  <ApplicantRow key={a.id} applicant={a} />
+                ))}
+
+                {rejectedApplicants.length > 0 && (
+                  <Text style={styles.subSectionLabel}>
+                    Rejected ({rejectedApplicants.length})
+                  </Text>
+                )}
+                {rejectedApplicants.slice(0, 3).map((a) => (
                   <ApplicantRow key={a.id} applicant={a} />
                 ))}
               </>
@@ -359,6 +542,88 @@ export default function OrganizationEventDetail() {
           </Pressable>
         </View>
       </SafeAreaView>
+
+      <Modal
+        visible={reviewTarget !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setReviewTarget(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Review Volunteer</Text>
+              <Pressable
+                onPress={() => setReviewTarget(null)}
+                hitSlop={10}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </Pressable>
+            </View>
+            <Text style={styles.modalSubtitle}>
+              {reviewTarget?.userEmail}
+            </Text>
+
+            <ScrollView
+              style={styles.modalScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.ratingLabel}>Reliability</Text>
+              <StarRating
+                rating={reviewReliability}
+                size={28}
+                interactive
+                onRate={setReviewReliability}
+              />
+
+              <Text style={styles.ratingLabel}>Communication</Text>
+              <StarRating
+                rating={reviewCommunication}
+                size={28}
+                interactive
+                onRate={setReviewCommunication}
+              />
+
+              <Text style={styles.ratingLabel}>Effort</Text>
+              <StarRating
+                rating={reviewEffort}
+                size={28}
+                interactive
+                onRate={setReviewEffort}
+              />
+
+              <Text style={styles.ratingLabel}>Comment</Text>
+              <TextInput
+                style={styles.commentInput}
+                value={reviewComment}
+                onChangeText={setReviewComment}
+                placeholder="Share your experience with this volunteer..."
+                placeholderTextColor="#999"
+                multiline
+                textAlignVertical="top"
+              />
+            </ScrollView>
+
+            <Pressable
+              style={[
+                styles.submitReviewBtn,
+                submittingReview && { opacity: 0.6 },
+              ]}
+              onPress={handleSubmitReview}
+              disabled={submittingReview}
+            >
+              {submittingReview ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.submitReviewBtnText}>Submit Review</Text>
+              )}
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -367,17 +632,25 @@ function ApplicantRow({
   applicant,
   onAccept,
   onReject,
+  onComplete,
+  onReview,
+  hasReview,
 }: {
   applicant: Applicant;
   onAccept?: () => void;
   onReject?: () => void;
+  onComplete?: () => void;
+  onReview?: () => void;
+  hasReview?: boolean;
 }) {
   const statusColor =
-    applicant.status === "accepted"
+    applicant.status === "completed"
       ? "#34C759"
-      : applicant.status === "rejected"
-        ? "#FF3B30"
-        : "#FF9500";
+      : applicant.status === "accepted"
+        ? "#208AEF"
+        : applicant.status === "rejected"
+          ? "#FF3B30"
+          : "#FF9500";
   const initials = applicant.userEmail
     .substring(0, 2)
     .toUpperCase();
@@ -407,6 +680,24 @@ function ApplicantRow({
           <Pressable onPress={onReject} style={styles.rejectBtn}>
             <Ionicons name="close" size={18} color="#fff" />
           </Pressable>
+        </View>
+      )}
+      {applicant.status === "accepted" && (
+        <View style={styles.applicantActions}>
+          {onReview ? (
+            <Pressable onPress={onReview} style={styles.reviewBtn}>
+              <Ionicons name="star-outline" size={16} color="#208AEF" />
+            </Pressable>
+          ) : hasReview ? (
+            <View style={styles.reviewedBadge}>
+              <Ionicons name="star" size={14} color="#FFB800" />
+            </View>
+          ) : null}
+          {onComplete && (
+            <Pressable onPress={onComplete} style={styles.completeBtn}>
+              <Ionicons name="checkmark-circle" size={18} color="#fff" />
+            </Pressable>
+          )}
         </View>
       )}
     </View>
@@ -613,6 +904,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  completeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "#34C759",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  completeAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#34C759",
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  completeAllText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#fff",
+  },
 
   bottomBar: {
     borderTopWidth: 1,
@@ -639,5 +953,83 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#FFF0F0",
     borderRadius: 16,
+  },
+  reviewBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "#208AEF18",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  reviewedBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "#FFF8E1",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === "ios" ? 40 : 24,
+    maxHeight: "85%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "#888",
+    marginBottom: 16,
+  },
+  modalScroll: {
+    marginBottom: 16,
+  },
+  ratingLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  commentInput: {
+    backgroundColor: "#F7F8FA",
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    color: "#222",
+    minHeight: 100,
+    marginTop: 4,
+  },
+  submitReviewBtn: {
+    backgroundColor: "#208AEF",
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitReviewBtnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#fff",
   },
 });

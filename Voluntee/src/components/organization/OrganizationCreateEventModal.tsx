@@ -24,7 +24,7 @@ type OrganizationCreateEventModalProps = {
   onCreated?: () => void;
 };
 
-type CategoryId = "environment" | "social" | "animals" | "education";
+type CategoryId = "environment" | "social" | "animals" | "community" | "education";
 
 const CATEGORIES: {
   id: CategoryId;
@@ -34,6 +34,7 @@ const CATEGORIES: {
   { id: "environment", label: "Environment", icon: "leaf" },
   { id: "social", label: "Social", icon: "people" },
   { id: "animals", label: "Animals", icon: "paw" },
+  { id: "community", label: "Community", icon: "heart" },
   { id: "education", label: "Education", icon: "school" },
 ];
 
@@ -62,6 +63,7 @@ export function OrganizationCreateEventModal({
   const [timeStr, setTimeStr] = useState("09:00 AM");
   const [limitStr, setLimitStr] = useState("12");
   const [pointsXp, setPointsXp] = useState("450");
+  const [durationStr, setDurationStr] = useState("180");
 
   useEffect(() => {
     if (!visible) return;
@@ -73,6 +75,7 @@ export function OrganizationCreateEventModal({
     setTimeStr("09:00 AM");
     setLimitStr("12");
     setPointsXp("450");
+    setDurationStr("180");
   }, [visible]);
 
   async function handleSubmit() {
@@ -81,6 +84,7 @@ export function OrganizationCreateEventModal({
     const volunteersNeeded = parseInt(limitStr, 10) || 12;
     const points = parseInt(pointsXp, 10) || 15;
     const startsAt = parseDateTimeToISO(dateStr, timeStr);
+    const durationMinutes = parseInt(durationStr, 10) || 180;
 
     const id = await create({
       title: title.trim(),
@@ -91,7 +95,7 @@ export function OrganizationCreateEventModal({
       latitude: 45.815,
       longitude: 15.9819,
       startsAt,
-      durationMinutes: 180,
+      durationMinutes,
       volunteersNeeded,
       volunteersApplied: 0,
       points,
@@ -219,6 +223,20 @@ export function OrganizationCreateEventModal({
 
           <View style={styles.row2}>
             <View style={styles.row2Col}>
+              <Text style={styles.label}>DURATION (MIN)</Text>
+              <View style={styles.inlineField}>
+                <Ionicons name="hourglass-outline" size={18} color={colors.primary} />
+                <TextInput
+                  style={styles.inlineInput}
+                  value={durationStr}
+                  onChangeText={(t) => setDurationStr(t.replace(/\D/g, ""))}
+                  keyboardType="number-pad"
+                  placeholder="180"
+                  placeholderTextColor={colors.muted}
+                />
+              </View>
+            </View>
+            <View style={styles.row2Col}>
               <Text style={styles.label}>LIMIT</Text>
               <View style={styles.inlineField}>
                 <Ionicons name="person-outline" size={18} color={colors.primary} />
@@ -230,6 +248,9 @@ export function OrganizationCreateEventModal({
                 />
               </View>
             </View>
+          </View>
+
+          <View style={styles.row2}>
             <View style={styles.row2Col}>
               <Text style={styles.label}>POINTS REWARD</Text>
               <View style={styles.pointsField}>
