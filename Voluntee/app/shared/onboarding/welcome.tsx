@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import { BackHandler, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { ScreenWrapper } from "@/components/shared/ScreenWrapper";
 import { colors, spacing, typography } from "@/theme";
+import { enterDevOrganizationDashboard } from "@/utils/dev/enterDevOrganization";
 
 export default function Welcome() {
   useFocusEffect(
@@ -104,6 +105,17 @@ export default function Welcome() {
           >
             <Text style={styles.devBtnText}>[DEV] Skip to volunteer home</Text>
           </Pressable>
+          {__DEV__ ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.devBtnOrg,
+                pressed && styles.ctaPressed,
+              ]}
+              onPress={() => enterDevOrganizationDashboard()}
+            >
+              <Text style={styles.devBtnOrgText}>[DEV] Skip to organizer dashboard</Text>
+            </Pressable>
+          ) : null}
 
           <Text style={styles.footerText}>
             ZAGREB VOLUNTEER NETWORK • 2026
@@ -275,6 +287,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: "#b45309",
+  },
+  devBtnOrg: {
+    borderWidth: 2,
+    borderColor: "#208AEF",
+    borderStyle: "dashed",
+    borderRadius: 10,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: "#EFF6FF",
+    marginTop: spacing.sm,
+  },
+  devBtnOrgText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1D4ED8",
   },
   footerText: {
     fontSize: 11,
