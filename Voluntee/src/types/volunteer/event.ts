@@ -10,6 +10,7 @@ export type VolunteerEvent = {
   title: string;
   description: string;
   category: EventCategory;
+  tags: string[];
   address: string;
   latitude: number;
   longitude: number;

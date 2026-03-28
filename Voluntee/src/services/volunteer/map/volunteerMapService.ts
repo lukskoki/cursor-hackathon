@@ -25,6 +25,11 @@ function haversineKm(
 export type MapEvent = VolunteerEvent & { distanceKm: number };
 
 export const volunteerMapService = {
+  getById: async (id: string): Promise<VolunteerEvent | null> => {
+    await delay(100);
+    return MOCK_MAP_EVENTS.find((e) => e.id === id) ?? null;
+  },
+
   getNearby: async (opts: {
     userLat: number;
     userLon: number;

@@ -1,4 +1,10 @@
-import { useRef, useEffect, type ReactNode } from "react";
+import {
+  useRef,
+  useEffect,
+  useImperativeHandle,
+  forwardRef,
+  type ReactNode,
+} from "react";
 import {
   View,
   Animated,
@@ -14,13 +20,18 @@ const TOP_Y = Math.min(...SNAP_Y);
 const BOTTOM_Y = Math.max(...SNAP_Y);
 const INITIAL_Y = SNAP_Y[1];
 
+export type DraggableSheetRef = {
+  snapTo: (index: number) => void;
+};
+
 type Props = {
   children: ReactNode;
   header?: ReactNode;
   floatingButton?: ReactNode;
 };
 
-export function DraggableSheet({ children, header, floatingButton }: Props) {
+export const DraggableSheet = forwardRef<DraggableSheetRef, Props>(
+  function DraggableSheet({ children, header, floatingButton }, ref) {
   const y = useRef(new Animated.Value(INITIAL_Y)).current;
   const lastPos = useRef(INITIAL_Y);
 
@@ -30,6 +41,19 @@ export function DraggableSheet({ children, header, floatingButton }: Props) {
     });
     return () => y.removeListener(id);
   }, [y]);
+
+  useImperativeHandle(ref, () => ({
+    snapTo(index: number) {
+      const sorted = [...SNAP_Y].sort((a, b) => a - b);
+      const target = sorted[Math.min(index, sorted.length - 1)] ?? INITIAL_Y;
+      Animated.spring(y, {
+        toValue: target,
+        useNativeDriver: false,
+        damping: 20,
+        stiffness: 180,
+      }).start();
+    },
+  }));
 
   const panResponder = useRef(
     PanResponder.create({
@@ -75,7 +99,7 @@ export function DraggableSheet({ children, header, floatingButton }: Props) {
       {children}
     </Animated.View>
   );
-}
+});
 
 const VY_THRESHOLD = 0.5;
 

@@ -1,10 +1,11 @@
-import { useRef, useCallback } from "react";
+import { useRef, useState, useCallback } from "react";
 import { StyleSheet, ActivityIndicator, View, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
+import type { VolunteerEvent } from "@/types/volunteer/event";
 import { useVolunteerMap } from "@/hooks/volunteer/map/useVolunteerMap";
 import { MapHeader } from "@/components/volunteer/map/MapHeader";
 import { CategoryFilters } from "@/components/volunteer/map/CategoryFilters";
@@ -13,6 +14,7 @@ import { NearbySheet } from "@/components/volunteer/map/NearbySheet";
 
 export default function VolunteerMap() {
   const mapRef = useRef<MapView>(null);
+  const [selectedEvent, setSelectedEvent] = useState<VolunteerEvent | null>(null);
   const {
     events,
     loading,
@@ -36,7 +38,14 @@ export default function VolunteerMap() {
   }, [userLocation, region]);
 
   const handleEventPress = (id: string) => {
-    router.push(`/volunteer/events/${id}`);
+    const evt = events.find((e) => e.id === id);
+    if (evt) setSelectedEvent(evt);
+  };
+
+  const handleDetailBack = () => setSelectedEvent(null);
+
+  const handleApply = (id: string) => {
+    router.push(`/volunteer/events/apply?id=${id}`);
   };
 
   return (
@@ -80,8 +89,11 @@ export default function VolunteerMap() {
         loading={loading}
         searchQuery={searchQuery}
         onEventPress={handleEventPress}
+        selectedEvent={selectedEvent}
+        onBack={handleDetailBack}
+        onApply={handleApply}
         floatingButton={
-          userLocation ? (
+          userLocation && !selectedEvent ? (
             <Pressable style={styles.locateBtn} onPress={handleCenterOnUser}>
               <Ionicons name="locate" size={22} color="#208AEF" />
             </Pressable>
