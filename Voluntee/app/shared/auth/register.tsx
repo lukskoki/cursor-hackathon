@@ -24,6 +24,8 @@ function mapRegisterError(e: unknown): string {
       ? String((e as { code: string }).code)
       : "";
   switch (code) {
+    case "auth/operation-not-allowed":
+      return "Email/lozinka nije uključena u Firebaseu: Authentication → Sign-in method → Email/Password → Enable.";
     case "auth/email-already-in-use":
       return "Email je već registriran.";
     case "auth/invalid-email":

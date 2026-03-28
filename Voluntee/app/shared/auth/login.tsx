@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import Constants from "expo-constants";
+import { ResponseType } from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
 import { Link, router } from "expo-router";
 import { authService } from "@/services/shared/authService";
@@ -20,14 +21,31 @@ const ROLES: { value: UserRole; label: string }[] = [
   { value: "organization", label: "Organization" },
 ];
 
-const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "";
+function sanitizePublicEnv(value: string): string {
+  return value
+    .trim()
+    .replace(/^\uFEFF/, "")
+    .replace(/^["']|["']$/g, "");
+}
+
+const GOOGLE_WEB_CLIENT_ID = sanitizePublicEnv(
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? ""
+);
+
+/** Ako je postavljen, mora biti identičan onome što Google vidi (vidi __DEV__ log ispod). */
+const EXPO_AUTH_REDIRECT_OVERRIDE =
+  process.env.EXPO_PUBLIC_EXPO_AUTH_REDIRECT_URI?.trim() ?? "";
 
 /**
  * Google Web OAuth prihvaća samo https:// redirecte. Expo Go inače generira exp://… — to NE ide u Google.
  * Proxy URL mora biti na listi: Google Cloud → Web client → Authorized redirect URIs.
+ * Ako si ulogiran u Expo CLI, originalFullName je često @tvojuser/slug, ne @anonymous/slug — zato mismatch.
  */
 function useExpoAuthProxyRedirectUri(): string {
   return useMemo(() => {
+    if (EXPO_AUTH_REDIRECT_OVERRIDE.length > 0) {
+      return EXPO_AUTH_REDIRECT_OVERRIDE;
+    }
     const full = Constants.expoConfig?.originalFullName;
     if (typeof full === "string" && full.length > 0) {
       return `https://auth.expo.io/${full}`;
@@ -43,6 +61,8 @@ function mapAuthError(e: unknown): string {
       ? String((e as { code: string }).code)
       : "";
   switch (code) {
+    case "auth/operation-not-allowed":
+      return "Email/lozinka nije uključena u Firebaseu: Authentication → Sign-in method → Email/Password → Enable.";
     case "auth/invalid-email":
       return "Neispravan email.";
     case "auth/user-disabled":
@@ -73,24 +93,65 @@ export default function Login() {
   /**
    * Za https://auth.expo.io proxy redirect, Google traži da redirect bude na Web OAuth klijentu.
    * Koristi isti Web client ID na iOS/Android (ne zasebni iOS client + exp:// redirect).
+   *
+   * useIdTokenAuthRequest na iOS/Android forsira authorization code flow; razmjena koda za token
+   * često završi s redirect_uri_mismatch iako je authorize URI ispravan. Eksplicitni IdToken
+   * flow vraća id_token u pregledniku bez token endpointa.
    */
   const webId =
     GOOGLE_WEB_CLIENT_ID || "missing-web-client-id.apps.googleusercontent.com";
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+  const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: webId,
     iosClientId: webId,
     androidClientId: webId,
     redirectUri: googleRedirectUri,
+    responseType: ResponseType.IdToken,
   });
 
   useEffect(() => {
     if (__DEV__) {
       console.log(
-        "[Google OAuth] U Web client → Authorized redirect URIs dodaj TOČNO:\n",
+        "[Google OAuth] Očekivani redirect (iz koda):\n",
         googleRedirectUri
       );
     }
   }, [googleRedirectUri]);
+
+  useEffect(() => {
+    if (!__DEV__ || !request) return;
+    console.log(
+      "[Google OAuth] Stvarni redirect_uri u zahtjevu (kopiraj OVO u Google Cloud ako se razlikuje):\n",
+      request.redirectUri
+    );
+    if (request.url) {
+      try {
+        const u = new URL(request.url);
+        const raw = u.searchParams.get("redirect_uri");
+        const cid = u.searchParams.get("client_id");
+        console.log("[Google OAuth] Iz punog auth URL-a (provjeri client_id u Google Cloud):", {
+          client_id: cid,
+          response_type: u.searchParams.get("response_type"),
+          redirect_uri_decoded: raw ? decodeURIComponent(raw) : null,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [request]);
+
+  useEffect(() => {
+    if (response?.type !== "error") return;
+    const p = response.params;
+    const desc =
+      (typeof p.error_description === "string" && p.error_description) ||
+      (response.error && "message" in response.error
+        ? String(response.error.message)
+        : "");
+    const code = p.error ?? "oauth_error";
+    setError(
+      desc ? `${code}: ${desc}` : `Google OAuth: ${code}`
+    );
+  }, [response]);
 
   useEffect(() => {
     if (response?.type !== "success") return;
