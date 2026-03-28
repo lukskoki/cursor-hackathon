@@ -1,13 +1,20 @@
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { authService } from "@/services/shared/authService";
 import { useAuthStore } from "@/store/authStore";
 
 export default function VolunteerProfile() {
-  const { email, signOut } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const email = user?.email?.trim() ?? "";
+  const displayName =
+    user?.role === "volunteer" ? user.displayName.trim() : "";
+  const avatarSource = displayName || email || "V";
+  const avatarLetter = avatarSource.charAt(0).toUpperCase();
 
-  const handleLogout = () => {
-    signOut();
+  const handleLogout = async () => {
+    await authService.signOutUser();
+    useAuthStore.getState().setUser(null);
     router.replace("/");
   };
 
@@ -16,10 +23,12 @@ export default function VolunteerProfile() {
       <Text style={styles.heading}>Profile</Text>
 
       <View style={styles.avatar}>
-        <Text style={styles.avatarTxt}>{(email ?? "V")[0].toUpperCase()}</Text>
+        <Text style={styles.avatarTxt}>{avatarLetter}</Text>
       </View>
 
-      <Text style={styles.email}>{email}</Text>
+      <Text style={styles.email}>
+        {email || "Not signed in (preview)"}
+      </Text>
 
       <View style={styles.stats}>
         <Stat label="Points" value="0" />
