@@ -1,12 +1,14 @@
 import {
   createUserWithEmailAndPassword,
   deleteUser,
+  GoogleAuthProvider,
+  signInWithCredential,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
 } from "firebase/auth";
 import type { RegisterOrganizationInput, RegisterVolunteerInput } from "@/types/shared/auth";
-import type { UserProfile } from "@/types/shared/user";
+import type { UserProfile, UserRole } from "@/types/shared/user";
 import { isFirebaseConfigured } from "@/config/firebaseEnv";
 import { getFirebaseAuth } from "./firebaseApp";
 import {
@@ -36,6 +38,8 @@ export function mapFirebaseAuthError(code: string): string {
       return "An account already exists with this email.";
     case "auth/weak-password":
       return "Password should be at least 6 characters.";
+    case "auth/operation-not-allowed":
+      return "This sign-in method is disabled in Firebase (Authentication → Sign-in method).";
     case "auth/network-request-failed":
       return "Network error. Check your connection.";
     default:
@@ -75,6 +79,49 @@ export const authService = {
     if (!profile) {
       await signOut(auth);
       throw new Error("Your account has no profile. Contact support.");
+    }
+    return profile;
+  },
+
+  /**
+   * Google (expo-auth-session id_token). New users get a volunteer profile unless
+   * they requested organization — then they must use email registration.
+   */
+  async signInWithGoogleIdToken(
+    idToken: string,
+    preferredRole: UserRole,
+  ): Promise<UserProfile> {
+    assertConfigured();
+    const auth = getFirebaseAuth();
+    const credential = GoogleAuthProvider.credential(idToken);
+    const cred = await signInWithCredential(auth, credential).catch(
+      (e: unknown) => {
+        throw new Error(authErrorMessage(e));
+      },
+    );
+    let profile = await fetchUserProfileWithRetry(cred.user.uid);
+    if (!profile) {
+      const email = cred.user.email ?? "";
+      if (preferredRole === "organization") {
+        await signOut(auth);
+        throw new Error(
+          "Organization accounts must register with email. Use the organization sign-up flow.",
+        );
+      }
+      const displayName =
+        cred.user.displayName?.trim() ||
+        email.split("@")[0] ||
+        "Volunteer";
+      await createVolunteerProfile(cred.user.uid, email, displayName);
+      const name = displayName.trim();
+      if (name) {
+        await updateProfile(cred.user, { displayName: name }).catch(() => {});
+      }
+      profile = await fetchUserProfileWithRetry(cred.user.uid);
+    }
+    if (!profile) {
+      await signOut(auth);
+      throw new Error("Could not load your profile. Try again.");
     }
     return profile;
   },

@@ -1,6 +1,9 @@
 import { Fragment } from "react";
+import * as WebBrowser from "expo-web-browser";
 import { Stack } from "expo-router";
 import { useAuthBootstrap } from "@/hooks/shared/useAuth";
+
+WebBrowser.maybeCompleteAuthSession();
 
 function AuthBootstrap() {
   useAuthBootstrap();
