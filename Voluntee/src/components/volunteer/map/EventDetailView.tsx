@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { VolunteerEvent, EventCategory } from "@/types/volunteer/event";
@@ -50,6 +51,7 @@ type Props = {
 };
 
 export function EventDetailView({ event, onBack, onApply }: Props) {
+  const [liked, setLiked] = useState(false);
   const color = CAT_COLOR[event.category];
   const spotsLeft = event.volunteersNeeded - event.volunteersApplied;
   const spotsPct = (event.volunteersApplied / event.volunteersNeeded) * 100;
@@ -75,7 +77,16 @@ export function EventDetailView({ event, onBack, onApply }: Props) {
         </View>
 
         <View style={styles.body}>
-          <Text style={styles.title}>{event.title}</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{event.title}</Text>
+            <Pressable onPress={() => setLiked((p) => !p)} style={styles.likeBtn}>
+              <Ionicons
+                name={liked ? "heart" : "heart-outline"}
+                size={24}
+                color={liked ? "#FF3B30" : "#999"}
+              />
+            </Pressable>
+          </View>
           <View style={styles.organizerRow}>
             <Ionicons name="business-outline" size={14} color="#888" />
             <Text style={styles.organizer}>{event.organizerName}</Text>
@@ -196,7 +207,14 @@ const styles = StyleSheet.create({
   categoryText: { fontSize: 13, fontWeight: "600" },
 
   body: { paddingHorizontal: 20, paddingTop: 16 },
-  title: { fontSize: 22, fontWeight: "700", color: "#111", marginBottom: 6 },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  title: { fontSize: 22, fontWeight: "700", color: "#111", marginBottom: 6, flex: 1 },
+  likeBtn: { paddingTop: 4 },
   organizerRow: {
     flexDirection: "row",
     alignItems: "center",
