@@ -13,88 +13,77 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import Svg, { Path } from "react-native-svg";
+
+import type { EventCategory, VolunteerEvent } from "@/types/volunteer/event";
+import { MOCK_MAP_EVENTS } from "@/services/volunteer/map/mockMapData";
+import { useVolunteerAppliedStore } from "@/store/volunteerAppliedStore";
 
 const ACTIVE_BLUE = "#208AEF";
 
 const CATEGORIES = ["All", "Environment", "Animals", "Social", "Community"] as const;
 
-type CategoryId = (typeof CATEGORIES)[number];
+/** Isti redoslijed kao prije: okoliš, životinje, društvo, zajednica — ID-evi iz mape. */
+const HOME_FEED_IDS = ["evt-1", "evt-3", "evt-4", "evt-5"] as const;
 
-const CATEGORY_THEME: Record<
-  Exclude<CategoryId, "All">,
-  { accent: string; labelHr: string }
-> = {
-  Environment: {
+const HOME_FEED_EVENTS: VolunteerEvent[] = HOME_FEED_IDS.map((id) => {
+  const e = MOCK_MAP_EVENTS.find((x) => x.id === id);
+  return e!;
+}).filter(Boolean);
+
+const CATEGORY_THEME: Record<EventCategory, { accent: string; labelHr: string }> = {
+  environment: {
     accent: "#2D9D78",
     labelHr: "Okoliš",
   },
-  Animals: {
+  animals: {
     accent: "#C45C26",
     labelHr: "Životinje",
   },
-  Social: {
+  social: {
     accent: "#7C5CE6",
     labelHr: "Društvo",
   },
-  Community: {
+  community: {
     accent: ACTIVE_BLUE,
     labelHr: "Zajednica",
   },
+  education: {
+    accent: "#208AEF",
+    labelHr: "Obrazovanje",
+  },
 };
 
-function getCategoryTheme(category: string) {
-  const key = category as Exclude<CategoryId, "All">;
-  if (key in CATEGORY_THEME) return CATEGORY_THEME[key];
-  return CATEGORY_THEME.Community;
+const CHIP_TO_EVENT_CATEGORY: Record<string, EventCategory | null> = {
+  All: null,
+  Environment: "environment",
+  Animals: "animals",
+  Social: "social",
+  Community: "community",
+};
+
+function getCategoryTheme(category: EventCategory) {
+  return CATEGORY_THEME[category] ?? CATEGORY_THEME.community;
 }
 
-type Opportunity = {
-  id: string;
-  description: string;
-  location: string;
-  hours: string;
-  category: string;
-  author: {
-    kind: "organization" | "individual";
-    name: string;
-  };
-};
+function formatCardDate(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
-const MOCK_OPPORTUNITIES: Opportunity[] = [
-  {
-    id: "1",
-    description: "Sadnja stabala i uređenje parka.",
-    location: "Maksimir, Zagreb",
-    hours: "4 h",
-    category: "Environment",
-    author: { kind: "organization", name: "Zagreb Eco-Watch" },
-  },
-  {
-    id: "2",
-    description: "Šetnje pasa i pomoć u skloništu.",
-    location: "Dumovec, Zagreb",
-    hours: "3 h",
-    category: "Animals",
-    author: { kind: "organization", name: "Sklonište Dumovec" },
-  },
-  {
-    id: "3",
-    description: "Druženje i pomoć u domu za starije.",
-    location: "Tresnjevka, Zagreb",
-    hours: "2 h",
-    category: "Social",
-    author: { kind: "individual", name: "Ivan Ivić" },
-  },
-  {
-    id: "4",
-    description: "Sortiranje donacija u banci hrane.",
-    location: "Centar, Zagreb",
-    hours: "5 h",
-    category: "Community",
-    author: { kind: "organization", name: "Hrvatski Crveni križ" },
-  },
-];
+function formatCardDurationMinutes(mins: number) {
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
 
 function authorInitials(displayName: string): string {
   const parts = displayName.trim().split(/\s+/).filter(Boolean);
@@ -154,9 +143,25 @@ function IconClock({ size = 14, color = "#888" }: { size?: number; color?: strin
   );
 }
 
-function OpportunityCard({ item }: { item: Opportunity }) {
-  const theme = getCategoryTheme(item.category);
+function IconCalendar({ size = 14, color = "#888" }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function HomeFeedCard({ event }: { event: VolunteerEvent }) {
+  const theme = getCategoryTheme(event.category);
   const metaIconColor = "#94a3b8";
+  const orgName = event.organizerName;
+  const isApplied = useVolunteerAppliedStore((s) => !!s.appliedIds[event.id]);
 
   return (
     <View
@@ -171,30 +176,56 @@ function OpportunityCard({ item }: { item: Opportunity }) {
 
       <View style={styles.cardMain}>
         <View style={styles.cardBody}>
-          <Text style={styles.description}>{item.description}</Text>
+          <View style={styles.cardHeadRow}>
+            <Text style={[styles.description, styles.cardHeadTitle]} numberOfLines={2}>
+              {event.title}
+            </Text>
+            {isApplied ? (
+              <View
+                style={[styles.appliedPill, { backgroundColor: `${theme.accent}1F` }]}
+              >
+                <Ionicons name="checkmark-circle" size={14} color={theme.accent} />
+                <Text style={[styles.appliedPillText, { color: theme.accent }]}>
+                  Prijavljeno
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <Text style={[styles.categoryLine, { color: theme.accent }]}>
             {theme.labelHr}
           </Text>
-          <View style={styles.metaRow}>
-            <IconPin color={metaIconColor} />
-            <Text style={styles.metaText}>{item.location}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <IconClock color={metaIconColor} />
-            <Text style={styles.metaText}>{item.hours}</Text>
+          <View style={styles.metaBlock}>
+            <View style={styles.metaRow}>
+              <View style={styles.metaIconWrap}>
+                <IconPin color={metaIconColor} />
+              </View>
+              <Text style={styles.metaText}>{event.address}</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <View style={styles.metaIconWrap}>
+                <IconCalendar color={metaIconColor} />
+              </View>
+              <Text style={styles.metaText}>{formatCardDate(event.startsAt)}</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <View style={styles.metaIconWrap}>
+                <IconClock color={metaIconColor} />
+              </View>
+              <Text style={styles.metaText}>
+                {formatCardDurationMinutes(event.durationMinutes)}
+              </Text>
+            </View>
           </View>
           <View style={styles.authorRow}>
             <View style={styles.authorAvatar}>
               <Text style={styles.authorAvatarText}>
-                {authorInitials(item.author.name)}
+                {authorInitials(orgName)}
               </Text>
             </View>
             <View style={styles.authorTextCol}>
-              <Text style={styles.authorKind}>
-                {item.author.kind === "organization" ? "Organizacija" : "Privatni korisnik"}
-              </Text>
+              <Text style={styles.authorKind}>Organizacija</Text>
               <Text style={styles.authorName} numberOfLines={2}>
-                {item.author.name}
+                {orgName}
               </Text>
             </View>
           </View>
@@ -215,6 +246,7 @@ const SEARCH_SPRING = {
 };
 
 export default function VolunteerHome() {
+  const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
   const contentWidth = Math.max(0, windowWidth - 40);
   const searchOpenWidth = Math.min(
@@ -232,17 +264,18 @@ export default function VolunteerHome() {
   const searchWidthAnim = useRef(new Animated.Value(0)).current;
 
   const filtered = useMemo(() => {
-    let list =
-      selectedCategory === "All"
-        ? MOCK_OPPORTUNITIES
-        : MOCK_OPPORTUNITIES.filter((o) => o.category === selectedCategory);
-
+    let list = [...HOME_FEED_EVENTS];
+    const chipCat = CHIP_TO_EVENT_CATEGORY[selectedCategory];
+    if (chipCat != null) {
+      list = list.filter((e) => e.category === chipCat);
+    }
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       list = list.filter(
-        (o) =>
-          o.author.name.toLowerCase().includes(q) ||
-          o.description.toLowerCase().includes(q),
+        (e) =>
+          e.title.toLowerCase().includes(q) ||
+          e.description.toLowerCase().includes(q) ||
+          e.organizerName.toLowerCase().includes(q),
       );
     }
     return list;
@@ -395,11 +428,13 @@ export default function VolunteerHome() {
         }
         renderItem={({ item }) => (
           <Pressable
+            style={({ pressed }) => [pressed && styles.cardPressablePressed]}
+            onPress={() => router.push(`/volunteer/events/${item.id}`)}
             onPressIn={() => {
               if (searchOpen || searchBarMounted) handleOutsideSearch();
             }}
           >
-            <OpportunityCard item={item} />
+            <HomeFeedCard event={item} />
           </Pressable>
         )}
       />
@@ -539,6 +574,30 @@ const styles = StyleSheet.create({
     gap: 8,
     minWidth: 0,
   },
+  cardHeadRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  cardHeadTitle: {
+    flex: 1,
+    minWidth: 0,
+  },
+  appliedPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  appliedPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.15,
+  },
   description: {
     fontSize: 16,
     fontWeight: "600",
@@ -551,22 +610,37 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: 0.2,
   },
+  metaBlock: {
+    gap: 5,
+  },
   metaRow: {
     flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  metaIconWrap: {
+    width: 18,
+    paddingTop: 1,
     alignItems: "center",
-    gap: 6,
   },
   metaText: {
     fontSize: 13,
-    color: "#555",
+    color: "#64748b",
     flex: 1,
+    lineHeight: 18,
+  },
+  cardPressablePressed: {
+    opacity: 0.94,
+    transform: [{ scale: 0.992 }],
   },
   authorRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginTop: 2,
-    paddingVertical: 4,
+    marginTop: 4,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(0,0,0,0.06)",
   },
   authorAvatar: {
     width: 30,
