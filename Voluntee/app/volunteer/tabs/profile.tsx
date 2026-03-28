@@ -126,9 +126,13 @@ export default function VolunteerProfile() {
           </Pressable>
         </View>
         <View style={styles.badgesRow}>
-          {profile.badges.map((b) => (
-            <ProfileBadgeIcon key={b.id} badge={b} accent={accent} />
-          ))}
+          {profile.badges.length === 0 ? (
+            <Text style={styles.emptyHint}>No badges yet — join events to earn them.</Text>
+          ) : (
+            profile.badges.map((b) => (
+              <ProfileBadgeIcon key={b.id} badge={b} accent={accent} />
+            ))
+          )}
         </View>
 
         <View style={styles.segment}>
@@ -151,30 +155,42 @@ export default function VolunteerProfile() {
 
         {tab === "activities" && (
           <View style={styles.tabContent}>
-            {profile.pastActivities.map((a) => (
-              <PastActivityCard key={a.id} activity={a} accent={accent} />
-            ))}
+            {profile.pastActivities.length === 0 ? (
+              <Text style={styles.emptyHint}>No completed activities yet.</Text>
+            ) : (
+              profile.pastActivities.map((a) => (
+                <PastActivityCard key={a.id} activity={a} accent={accent} />
+              ))
+            )}
           </View>
         )}
         {tab === "reviews" && (
           <View style={styles.tabContent}>
-            {profile.reviews.map((r) => (
-              <ReviewCard
-                key={r.id}
-                author={r.authorName}
-                body={r.body}
-                rating={r.rating}
-              />
-            ))}
+            {profile.reviews.length === 0 ? (
+              <Text style={styles.emptyHint}>No reviews yet.</Text>
+            ) : (
+              profile.reviews.map((r) => (
+                <ReviewCard
+                  key={r.id}
+                  author={r.authorName}
+                  body={r.body}
+                  rating={r.rating}
+                />
+              ))
+            )}
           </View>
         )}
         {tab === "interests" && (
           <View style={styles.interestsWrap}>
-            {profile.interests.map((i) => (
-              <View key={i.id} style={styles.interestChip}>
-                <Text style={styles.interestChipText}>{i.label}</Text>
-              </View>
-            ))}
+            {profile.interests.length === 0 ? (
+              <Text style={styles.emptyHint}>No interests listed yet.</Text>
+            ) : (
+              profile.interests.map((i) => (
+                <View key={i.id} style={styles.interestChip}>
+                  <Text style={styles.interestChipText}>{i.label}</Text>
+                </View>
+              ))
+            )}
           </View>
         )}
 
@@ -317,6 +333,13 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl + spacing.md,
   },
   errorText: { padding: spacing.md, color: "#c00" },
+  emptyHint: {
+    fontSize: 14,
+    color: colors.muted,
+    textAlign: "center",
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
   topBar: {
     flexDirection: "row",
     alignItems: "center",
